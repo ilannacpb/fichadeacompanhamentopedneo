@@ -9,7 +9,7 @@ exports.handler = async (event, context) => {
 
   try {
     const { getDatabase } = await import('@netlify/database');
-    const db = getDatabase({ connectionString: process.env.NETLIFY_DB_URL });
+    const db = getDatabase({ connectionString: process.env.PACIENTES_DB_URL });
 
     if (event.httpMethod === 'GET') {
       const rows = await db.sql`SELECT id, dados, atualizado_em FROM pacientes ORDER BY id ASC`;
