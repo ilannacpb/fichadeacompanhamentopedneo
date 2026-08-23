@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "@netlify/neon": "^0.1.2"
+    "@netlify/database": "^1.0.0"
   }
 }

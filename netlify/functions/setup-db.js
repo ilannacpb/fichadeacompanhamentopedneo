@@ -1,12 +1,11 @@
 // Rode esta função UMA VEZ, visitando /.netlify/functions/setup-db no navegador,
-// depois de ativar o Netlify Database no seu site. Ela cria a tabela "pacientes"
-// se ela ainda não existir. Pode rodar de novo sem problema (não apaga dados).
-const { neon } = require('@netlify/neon');
-
+// para criar a tabela "pacientes" (se ela ainda não existir). Pode rodar de novo
+// sem problema — não apaga dados existentes.
 exports.handler = async () => {
   try {
-    const sql = neon();
-    await sql`
+    const { getDatabase } = await import('@netlify/database');
+    const db = getDatabase();
+    await db.sql`
       CREATE TABLE IF NOT EXISTS pacientes (
         id SERIAL PRIMARY KEY,
         dados JSONB NOT NULL,

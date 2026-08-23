@@ -169,12 +169,51 @@
 </head>
 <body>
 
-<div id="loginGate" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#1D4ED8,#2563EB);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;text-align:center;padding:24px">
-  <div class="logo-badge" style="width:64px;height:64px;margin-bottom:18px"><svg viewBox="0 0 20 20" style="width:32px;height:32px;stroke:#fff"><rect x="2" y="7" width="16" height="6" rx="3"/><line x1="10" y1="7" x2="10" y2="13"/></svg></div>
-  <h1 style="font-size:26px;margin-bottom:6px">Farmácia Clínica - HMAF</h1>
-  <p style="opacity:.85;margin-bottom:28px;max-width:360px">Faça login com sua conta da equipe para acessar os pacientes.</p>
-  <button class="btn" style="background:#fff;color:#1D4ED8;font-weight:800;padding:12px 28px;border-radius:999px;border:none;cursor:pointer;font-size:14px" onclick="netlifyIdentity.open()">Entrar</button>
-  <p id="loginErro" style="margin-top:16px;color:#FEE2E2;font-size:12.5px;display:none"></p>
+<style>
+  #loginGate{ position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; padding:24px;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(255,255,255,.08), transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(255,255,255,.06), transparent 45%),
+      linear-gradient(160deg, #0F1E4D 0%, #1D3FA6 48%, #2563EB 100%);
+    font-family:'Inter',sans-serif; overflow:hidden;
+  }
+  #loginGate::before{ content:''; position:absolute; inset:0;
+    background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size: 34px 34px; mask-image: radial-gradient(circle at 50% 40%, black, transparent 75%);
+  }
+  .login-card{ position:relative; z-index:1; background:#fff; border-radius:22px; padding:40px 38px 34px;
+    width:100%; max-width:380px; box-shadow:0 30px 70px -20px rgba(3,10,40,.55); text-align:center; }
+  .login-pulse{ width:100%; height:34px; margin-bottom:6px; }
+  .login-pulse path{ fill:none; stroke:#2563EB; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
+    stroke-dasharray:220; stroke-dashoffset:220; animation:loginPulseDraw 2.6s ease-in-out infinite; }
+  @keyframes loginPulseDraw{ 0%{stroke-dashoffset:220;} 55%{stroke-dashoffset:0;} 100%{stroke-dashoffset:-220;} }
+  .login-eyebrow{ font-size:11px; font-weight:800; letter-spacing:.14em; color:#2563EB; text-transform:uppercase; margin-bottom:8px; }
+  .login-card h1{ font-size:21px; font-weight:800; color:#141926; margin:0 0 6px; line-height:1.25; }
+  .login-card p.desc{ font-size:13px; color:#6B7690; margin:0 0 26px; line-height:1.55; }
+  .login-tags{ display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-bottom:26px; }
+  .login-tags span{ font-size:10.5px; font-weight:700; color:#3D5AFE; background:#EAF1FE; border:1px solid #DCE7FD; padding:4px 10px; border-radius:999px; }
+  .login-btn{ width:100%; background:linear-gradient(135deg,#2563EB,#1D4ED8); color:#fff; font-weight:800; font-size:14.5px;
+    padding:14px; border-radius:13px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+    box-shadow:0 12px 24px -10px rgba(37,99,235,.55); transition:transform .15s, box-shadow .15s; }
+  .login-btn:hover{ transform:translateY(-1px); box-shadow:0 16px 28px -10px rgba(37,99,235,.6); }
+  .login-foot{ margin-top:18px; font-size:11px; color:#9AA4B8; }
+  #loginErro{ margin-top:14px; color:#B91C1C; background:#FCE7E7; border-radius:10px; padding:9px 12px; font-size:12px; display:none; }
+</style>
+
+<div id="loginGate">
+  <div class="login-card">
+    <svg class="login-pulse" viewBox="0 0 200 34" preserveAspectRatio="none"><path d="M0 17 H70 L80 4 L92 30 L102 12 L110 17 H200"/></svg>
+    <div class="login-eyebrow">Farmácia Clínica</div>
+    <h1>HMAF — Acompanhamento Farmacoterapêutico</h1>
+    <p class="desc">Entre com sua conta da equipe para acessar os pacientes em acompanhamento.</p>
+    <div class="login-tags"><span>UTI Neonatal</span><span>UTI Pediátrica</span><span>UCSIN</span></div>
+    <button class="login-btn" onclick="netlifyIdentity.open()">
+      <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="#fff" stroke-width="1.6"><circle cx="10" cy="6.5" r="3.2"/><path d="M3.5 17c0-3.4 3-6 6.5-6s6.5 2.6 6.5 6"/></svg>
+      Entrar
+    </button>
+    <p id="loginErro"></p>
+    <div class="login-foot">Acesso restrito à equipe de farmácia clínica</div>
+  </div>
 </div>
 
 <div class="app-header">
