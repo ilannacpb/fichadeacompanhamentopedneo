@@ -4,7 +4,7 @@
 exports.handler = async () => {
   try {
     const { getDatabase } = await import('@netlify/database');
-    const db = getDatabase();
+    const db = getDatabase({ connectionString: process.env.NETLIFY_DB_URL });
     await db.sql`
       CREATE TABLE IF NOT EXISTS pacientes (
         id SERIAL PRIMARY KEY,
@@ -21,6 +21,6 @@ exports.handler = async () => {
       body: 'Tabela "pacientes" criada (ou já existia). Pode fechar esta aba e voltar para o app.'
     };
   } catch (err) {
-    return { statusCode: 500, body: 'Erro ao criar tabela: ' + err.message };
+    return { statusCode: 500, body: 'Erro ao criar tabela: ' + err.message + (process.env.NETLIFY_DB_URL ? '' : ' [NETLIFY_DB_URL está vazia neste processo]') };
   }
 };

@@ -9,20 +9,14 @@ exports.handler = async (event, context) => {
 
   try {
     const { getDatabase } = await import('@netlify/database');
-    const db = getDatabase();
+    const db = getDatabase({ connectionString: process.env.NETLIFY_DB_URL });
 
-    // ---------- LISTAR TODOS OS PACIENTES ----------
     if (event.httpMethod === 'GET') {
       const rows = await db.sql`SELECT id, dados, atualizado_em FROM pacientes ORDER BY id ASC`;
       const pacientes = rows.map(r => Object.assign({}, r.dados, { id: r.id }));
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pacientes)
-      };
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pacientes) };
     }
 
-    // ---------- CRIAR NOVO PACIENTE ----------
     if (event.httpMethod === 'POST') {
       const dados = JSON.parse(event.body);
       const rows = await db.sql`
@@ -33,7 +27,6 @@ exports.handler = async (event, context) => {
       return { statusCode: 200, body: JSON.stringify({ id: rows[0].id }) };
     }
 
-    // ---------- ATUALIZAR PACIENTE EXISTENTE ----------
     if (event.httpMethod === 'PUT') {
       const { id, dados } = JSON.parse(event.body);
       if (!id) return { statusCode: 400, body: JSON.stringify({ error: 'id é obrigatório para atualizar.' }) };

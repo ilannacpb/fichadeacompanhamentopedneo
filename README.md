@@ -36,4 +36,4 @@ Como a partir de agora o app guarda dados clínicos reais num banco compartilhad
 
 ## Sobre as planilhas comparativas e o protótipo Python
 
-Ficaram no repositório como registro do processo de comparação de abordagens — o app (`index.html` + backend) é a versão recomendada para uso contínuo
+Ficaram no repositório como registro do processo de comparação de abordagens — o app (`index.html` + backend) é a versão recomendada para uso contínuo.
