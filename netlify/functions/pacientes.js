@@ -3,8 +3,8 @@
 // X-Team-Password a cada chamada. O nome de quem está usando (X-Team-Name)
 // é auto-declarado (não autenticado) e usado só para fins de registro.
 exports.handler = async (event) => {
-  const senhaEnviada = event.headers['x-team-password'];
-  const nomeUsuario = event.headers['x-team-name'] || 'Desconhecido';
+  const senhaEnviada = event.headers['x-team-password'] || event.headers['X-Team-Password'];
+  const nomeUsuario = event.headers['x-team-name'] || event.headers['X-Team-Name'] || 'Desconhecido';
 
   if (!senhaEnviada || senhaEnviada !== process.env.EQUIPE_SENHA) {
     return { statusCode: 401, body: JSON.stringify({ error: 'Senha da equipe incorreta.' }) };
