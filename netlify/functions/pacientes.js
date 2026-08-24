@@ -41,6 +41,13 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ ok: true }) };
     }
 
+    if (event.httpMethod === 'DELETE') {
+      const { id } = JSON.parse(event.body);
+      if (!id) return { statusCode: 400, body: JSON.stringify({ error: 'id é obrigatório para excluir.' }) };
+      await db.sql`DELETE FROM pacientes WHERE id = ${id}`;
+      return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+    }
+
     return { statusCode: 405, body: 'Método não suportado.' };
   } catch (err) {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };

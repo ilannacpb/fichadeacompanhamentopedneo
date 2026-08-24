@@ -343,8 +343,12 @@
         <h4><svg class="ic" viewBox="0 0 20 20"><path d="M10 3l8 14H2z"/><line x1="10" y1="8" x2="10" y2="12"/><circle cx="10" cy="14.6" r="0.9" fill="currentColor" stroke="none"/></svg> Acesso aos Medicamentos</h4>
         <div class="field"><textarea id="rec_acesso" style="min-height:70px" placeholder="Como a família acessa/obtém os medicamentos..." oninput="p_updCampo('rec_acesso',this.value)"></textarea></div>
         <div class="grid g2" style="margin-top:12px">
-          <div class="field"><label>Medicamentos da UNICAT?</label><div class="chip-row" id="chipsUnicat"></div></div>
-          <div class="field"><label>Medicamentos Manipulados?</label><div class="chip-row" id="chipsManipulados"></div></div>
+          <div class="field"><label>Medicamentos da UNICAT?</label><div class="chip-row" id="chipsUnicat"></div>
+            <input type="text" id="rec_unicat_quais" placeholder="Quais medicamentos?" style="margin-top:8px;display:none" oninput="p_updCampo('rec_unicat_quais',this.value)">
+          </div>
+          <div class="field"><label>Medicamentos Manipulados?</label><div class="chip-row" id="chipsManipulados"></div>
+            <input type="text" id="rec_manipulados_quais" placeholder="Quais medicamentos?" style="margin-top:8px;display:none" oninput="p_updCampo('rec_manipulados_quais',this.value)">
+          </div>
         </div>
       </div>
 
@@ -368,7 +372,7 @@
         <div class="field" id="dietaVazaoSub" style="margin-top:12px;display:none"><label>Vazão / Infusão (NPT)</label><input type="text" id="dieta_vazao" placeholder="Ex: 20 mL/h" oninput="p_updCampo('dieta_vazao',this.value)"></div>
 
         <div class="field" style="margin-top:12px"><label>Aceitação</label><div class="chip-row" id="chipsAceitacao"></div></div>
-        <div class="field" id="residuoVolumeSub" style="margin-top:10px;display:none"><label>Volume do Resíduo</label><input type="text" id="residuo_volume" placeholder="Ex: 5 mL" oninput="p_updCampo('residuo_volume',this.value)"></div>
+        <div class="field" id="residuoVolumeSub" style="margin-top:10px;display:none"><label>Volume do Resíduo</label><input type="text" id="residuo_volume" placeholder="Ex: 20 mL/24h" oninput="p_updCampo('residuo_volume',this.value)"></div>
       </div>
       <div class="panel-card">
         <h4><svg class="ic" viewBox="0 0 20 20"><path d="M10 17S3 12 3 7.5A3.5 3.5 0 0 1 10 6a3.5 3.5 0 0 1 7 1.5C17 12 10 17 10 17z"/></svg> Funções Eliminatórias</h4>
@@ -520,11 +524,39 @@
 
     <div class="step-panel" id="step-6" style="display:none">
       <div class="panel-card">
-        <h4><svg class="ic" viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="14" rx="1"/><rect x="7" y="2" width="6" height="3" rx="1"/><line x1="7" y1="10" x2="13" y2="10"/><line x1="7" y1="13" x2="13" y2="13"/></svg> Conduta Farmacêutica <span style="font-weight:400;font-size:11px;color:var(--text-soft)">(só a intervenção de hoje — edite na aba Intervenções)</span></h4>
-        <div id="condutaPreview" style="font-size:13px;line-height:1.65;white-space:pre-wrap"></div>
+        <h4><svg class="ic" viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="14" rx="1"/><rect x="7" y="2" width="6" height="3" rx="1"/><line x1="7" y1="10" x2="13" y2="10"/><line x1="7" y1="13" x2="13" y2="13"/></svg> Conduta Farmacêutica <span style="font-weight:400;font-size:11px;color:var(--text-soft)">(intervenções de hoje + frases padronizadas + texto livre)</span></h4>
+        <div id="condutaPreview" style="font-size:13px;line-height:1.65;white-space:pre-wrap;margin-bottom:14px"></div>
+        <div class="field"><label>Frases padronizadas (clique para incluir)</label><div class="chip-row" id="chipsFrasesConduta"></div></div>
+        <div class="field" style="margin-top:12px"><label>Outras informações de conduta</label><textarea id="conduta_extra" style="min-height:70px" placeholder="Adicione qualquer informação de conduta que não esteja nas frases acima..." oninput="p_updCampo('conduta_extra',this.value)"></textarea></div>
       </div>
+
       <div class="panel-card">
-        <h4><svg class="ic" viewBox="0 0 20 20"><path d="M11 2 4 12h5l-1 6 7-10h-5l1-6z"/></svg> Plano Terapêutico Definido</h4>
+        <h4><svg class="ic" viewBox="0 0 20 20"><path d="M11 2 4 12h5l-1 6 7-10h-5l1-6z"/></svg> Modelos Prontos (Avaliação — Recomendação — Plano)</h4>
+        <div class="grid g2">
+          <div class="field"><label>Modelo Completo por Cenário Clínico</label>
+            <select id="modeloCompletoSelect"><option value="">Selecione...</option></select>
+          </div>
+          <div style="display:flex;align-items:flex-end"><button class="btn btn-mint" style="width:100%" onclick="inserirModeloCompleto()">+ Inserir Modelo Completo</button></div>
+        </div>
+        <div class="grid g3" style="margin-top:12px">
+          <div class="field"><label>Categoria (FARP)</label><select id="farpCategoriaSelect" onchange="atualizarCenariosFarp()"><option value="">Selecione...</option></select></div>
+          <div class="field"><label>Cenário</label><select id="farpCenarioSelect"><option value="">Selecione a categoria primeiro</option></select></div>
+          <div style="display:flex;align-items:flex-end"><button class="btn btn-mint" style="width:100%" onclick="inserirModeloFarp()">+ Inserir</button></div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <h4><svg class="ic" viewBox="0 0 20 20"><path d="M4 15l1-4 9-9 3 3-9 9-4 1z"/></svg> Avaliação Farmacêutica (A)</h4>
+        <div class="field"><textarea id="avaliacao_farmaceutica" style="min-height:90px" placeholder="Avalio..." oninput="p_updCampo('avaliacao_farmaceutica',this.value)"></textarea></div>
+      </div>
+
+      <div class="panel-card">
+        <h4><svg class="ic" viewBox="0 0 20 20"><path d="M11 2 4 12h5l-1 6 7-10h-5l1-6z"/></svg> Recomendação Farmacêutica (R)</h4>
+        <div class="field"><textarea id="recomendacao_farmaceutica" style="min-height:90px" placeholder="Sugiro..." oninput="p_updCampo('recomendacao_farmaceutica',this.value)"></textarea></div>
+      </div>
+
+      <div class="panel-card">
+        <h4><svg class="ic" viewBox="0 0 20 20"><path d="M11 2 4 12h5l-1 6 7-10h-5l1-6z"/></svg> Plano Terapêutico (P)</h4>
         <div class="field"><label>Frases padronizadas (clique para incluir)</label><div class="chip-row" id="chipsFrasesPlano"></div></div>
         <div class="field" style="margin-top:12px"><label>Outros parâmetros a monitorar (um por linha)</label><textarea id="plano_terapeutico" style="min-height:90px" placeholder="Ex: Acompanhar resposta clínica ao novo antimicrobiano (curva térmica e leucograma)." oninput="p_updCampo('plano_terapeutico',this.value)"></textarea></div>
       </div>
@@ -615,6 +647,17 @@
   </div>
 </div>
 
+<div class="modal-bg" id="modalExcluir">
+  <div class="modal">
+    <h3>Excluir Ficha</h3>
+    <p style="font-size:13px;color:var(--text-soft);line-height:1.6">Tem certeza que deseja excluir a ficha de <b id="excluirNomePaciente"></b>? <span style="color:var(--danger)">Essa ação não pode ser desfeita</span> — todos os dados (evoluções, intervenções, reconciliações) serão apagados permanentemente.</p>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+      <button class="btn btn-outline" onclick="fecharModalExcluir()">Cancelar</button>
+      <button class="btn" style="background:var(--danger);color:#fff" onclick="confirmarExclusao()">Excluir Definitivamente</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="modalResultado">
   <div class="modal" style="max-width:760px">
     <h3 id="resultadoTitulo">Texto Gerado</h3>
@@ -629,18 +672,42 @@
 
 <script>
 const TAXONOMIA = {
-  "Dose": { motivos:["Necessidade de dose de ataque","Subdose (Literatura)","Subdose (Função Renal/PK-PD)","Sobredose (Literatura)","Sobredose (Função Renal/PK-PD)"], sugestoes:["Fazer dose de ataque","Ajustar dose/frequência","Ajustar dose e frequência","Dose complementar pós-diálise","Medicamento pós-diálise"] },
+  "Dose": { motivos:["Necessidade de dose de ataque","Subdose baseada na literatura","Subdose baseada na função renal ou parâmetros PK/PD","Sobredose baseada na literatura","Sobredose baseada na função renal ou parâmetros PK/PD"],
+    sugestoes:["Fazer dose de ataque","Ajustar dose","Ajustar frequência","Ajustar dose e frequência","Administrar dose complementar após a diálise","Administrar medicamento após a diálise"] },
   "Dispensação": { motivos:["Medicamento indisponível","Medicamento não padronizado"], sugestoes:["Substituir medicamento"] },
   "Frequência de Administração": { motivos:["Frequência aumentada (menor intervalo)","Frequência diminuída (maior intervalo)"], sugestoes:["Ajustar frequência"] },
-  "Via / Forma Farmacêutica": { motivos:["Via inadequada para condição clínica","Critérios para iniciar transição oral","Forma inadequada para a via"], sugestoes:["Substituir forma farmacêutica","Substituir medicamento","Substituir via de administração","Realizar transição oral"] },
-  "Administração por Sonda": { motivos:["Administração inadequada por sonda enteral"], sugestoes:["Substituir forma/medicamento/via","Diluir com volume adequado para sonda"] },
-  "Tempo de Infusão & Diluição": { motivos:["Tempo de infusão não adequado/ausente","Indicação de infusão estendida","Volume diluição/reconstituição ausente/inadequado","Necessidade de restrição hídrica"], sugestoes:["Ajustar/incluir tempo de infusão","Prescrever infusão estendida","Inserir/ajustar volume de diluição","Substituir diluente / Restringir volume"] },
-  "Indicação & Resposta Terapêutica": { motivos:["Duplicidade / Sem indicação de uso","Medicamento inadequado à condição","Omissão uso habitual / Condição não tratada","Escolha em desacordo com protocolo","Paciente com alergia","Terapia sem resposta efetiva"], sugestoes:["Suspender/substituir medicamento","Incluir terapia adicional","Incluir medida não farmacológica","Ajustar dose e/ou frequência"] },
-  "Exames & Dispositivos": { motivos:["Ausência de monitoramento terapêutico","Risco de infecção de cateter / Cateter infectado"], sugestoes:["Solicitar exame lab/imagem/cultura/nível sérico","Remover/trocar cateter / Lockterapia"] },
-  "Reação Adversa (RAM)": { motivos:["Risco de reação adversa a medicamento","Reação adversa identificada"], sugestoes:["Ajustar tempo infusão/diluição","Administrar pré-medicação/hidratação","Suspender/substituir/incluir terapia"] },
-  "Incompatibilidade & Interações": { motivos:["Incompatibilidade físico-química","Interação Medicamentosa (Efetividade/Toxicidade)","Interação Fármaco-Nutriente"], sugestoes:["Alterar aprazamento / vias diferentes","Pausar, lavar via e administrar","Administrar em jejum / Pausar dieta"] },
-  "Gerenciamento de Antimicrobianos (Stewardship)": { motivos:["Tempo prolongado / Ausência de ficha ATM","ATM desnecessário / Resistente (Antibiograma)","Empírico inadequado / Sem cobertura","Sem penetração no sítio infeccioso","Espectro estreito ou amplo em cultura","Ausência de profilaxia cirúrgica/clínica"], sugestoes:["Escalonar/Descalonar terapia","Suspender/substituir medicamento","Ajustar dose/frequência/incluir terapia","Solicitar/renovar ficha de ATM"] },
-  "Analgesia Multimodal": { motivos:["Ausência de manejo da dor / Sem resposta","Risco de delirium e/ou abstinência","Uso prolongado de analgosedação"], sugestoes:["Incluir terapia / medida não farmacológica","Ajustar dose/frequência / Associar opção","Iniciar desmame / rodízio / sedativo enteral"] }
+  "Via de Administração": { motivos:["Via de administração não adequada para a condição clínica","Critérios para iniciar transição oral"],
+    sugestoes:["Substituir forma farmacêutica","Substituir medicamento","Substituir via de administração","Realizar transição oral do medicamento"] },
+  "Forma Farmacêutica": { motivos:["Forma farmacêutica não adequada para a via de administração"],
+    sugestoes:["Substituir forma farmacêutica","Substituir medicamento","Substituir via de administração"] },
+  "Administração do Medicamento": { motivos:["Administração não adequada por sonda enteral"],
+    sugestoes:["Substituir forma farmacêutica","Substituir medicamento","Substituir via de administração","Diluir com volume adequado para administração por sonda"] },
+  "Tempo de Infusão": { motivos:["Tempo de infusão não adequado","Ausência de tempo de infusão","Indicação de infusão estendida"],
+    sugestoes:["Ajustar tempo de infusão","Incluir tempo de infusão","Prescrever tempo de infusão estendida"] },
+  "Diluição": { motivos:["Volume de diluição e/ou reconstituição ausente","Volume de diluição e/ou reconstituição não adequado","Necessidade de restrição hídrica"],
+    sugestoes:["Inserir volume de diluição e/ou reconstituição","Ajustar volume de diluição e/ou reconstituição","Substituir diluente","Restringir volume de diluição"] },
+  "Adesão": { motivos:["Intolerância devido à palatabilidade da medicação"],
+    sugestoes:["Substituir forma farmacêutica","Substituir medicamento","Administrar o medicamento com alimentos","Diluir o medicamento em solução adocicada"] },
+  "Indicação": { motivos:["Duplicidade terapêutica","Paciente sem indicação para uso do medicamento","Medicamento inadequado para a condição clínica do paciente","Omissão de medicamento de uso habitual","Condição de saúde não tratada","Paciente com alergia ao medicamento","Escolha do medicamento não condiz com protocolo institucional"],
+    sugestoes:["Suspender medicamento","Substituir medicamento","Incluir terapia adicional","Incluir medida não farmacológica"] },
+  "Resposta Terapêutica": { motivos:["Terapia sem resposta efetiva"],
+    sugestoes:["Substituir medicamento","Ajustar dose","Ajustar frequência","Ajustar dose e frequência","Incluir terapia adicional"] },
+  "Solicitação de Exames": { motivos:["Ausência de monitoramento terapêutico"],
+    sugestoes:["Solicitar exame laboratorial","Solicitar teste rápido diagnóstico","Solicitar culturas","Solicitar nível sérico","Orientado coleta de nível sérico","Solicitar exame de imagem"] },
+  "Dispositivos": { motivos:["Risco de infecção de cateter","Cateter infectado"],
+    sugestoes:["Remover cateter","Trocar cateter","Fazer lock terapia conforme protocolo"] },
+  "Reação Adversa a Medicamentos": { motivos:["Risco de reação adversa a medicamento","Reação adversa identificada"],
+    sugestoes:["Ajustar tempo de infusão","Ajustar diluição","Administrar pré-medicação","Administrar hidratação venosa","Suspender medicamento","Substituir medicamento","Incluir terapia adicional"] },
+  "Incompatibilidade Físico-Química": { motivos:["Medicamento incompatível com o diluente ou com o medicamento"],
+    sugestoes:["Substituir medicamento","Aprazar em horários separados","Pausar infusão, lavar a via e administrar medicamento","Administrar em vias diferentes","Substituir via de administração","Ajustar diluição e/ou concentração","Puncionar novo acesso"] },
+  "Interação Medicamentosa": { motivos:["Risco de diminuição da efetividade do medicamento","Aumento do risco de reação ou toxicidade do medicamento"],
+    sugestoes:["Alterar aprazamento","Substituir medicamento"] },
+  "Interação Fármaco-Nutriente": { motivos:["Risco de diminuição da efetividade do medicamento","Aumento do risco de reação ou toxicidade do medicamento"],
+    sugestoes:["Substituir via de administração","Alterar aprazamento","Substituir medicamento","Administrar em jejum","Pausar a dieta, administrar e lavar a sonda"] },
+  "Gerenciamento de Antimicrobianos": { motivos:["Tempo prolongado de ATM","Ausência de ficha de ATM","ATM desnecessário baseado em clínica ou cultura","Microrganismo resistente ao ATM de acordo com o antibiograma","Terapia empírica não condizente com a epidemiologia ou com resultados laboratoriais/imagens","Paciente com alergia ao ATM","Microrganismo resistente ao ATM ou paciente sem resposta clínica","ATM sem penetração tissular no sítio infeccioso","ATM com espectro de ação estreito conforme resultado de cultura","ATM com espectro de ação amplo conforme resultado de cultura","Paciente sem cobertura empírica adequada e com indicação clínica e/ou laboratorial","Paciente sem ATM profilático cirúrgico","Paciente sem antibioticoprofilaxia justificada por imunodeficiência ou outra condição clínica"],
+    sugestoes:["Suspender medicamento","Solicitar nova ficha de ATM","Solicitar ficha de ATM","Substituir medicamento","Descalonar terapia","Escalonar terapia","Incluir terapia adicional","Ajustar dose","Ajustar frequência","Ajustar dose e frequência"] },
+  "Analgesia Multimodal": { motivos:["Ausência de medidas para manejo da dor","Analgosedação sem resposta efetiva","Risco de delirium e/ou abstinência","Uso prolongado de analgosedação"],
+    sugestoes:["Incluir terapia adicional","Incluir medida não farmacológica","Substituir medicamento","Ajustar dose","Ajustar frequência","Ajustar dose e frequência","Associar outra alternativa terapêutica para otimização da analgosedação","Iniciar desmame com sedativos enterais","Realizar rodízio de analgosedação","Realizar desmame de sedativo"] }
 };
 const MEDS_DVA = ["Adrenalina","Noradrenalina","Dobutamina","Dopamina","Milrinona","Vasopressina","Alprostadil","Nitroglicerina","Nitroprussiato","Amiodarona","Lidocaína","Outro"];
 const MEDS_SEDACAO = ["Fentanil","Dexmedetomidina","Morfina","Midazolam","Rocurônio","Escetamina","Propofol","Clonidina","Outro"];
@@ -709,7 +776,7 @@ function novaFichaObj(dados){
   return Object.assign({
     id: -(Date.now() + Math.floor(Math.random()*1000)), _novo: true, status:'Ativo', tipoAlta:null, dataAlta:null,
     dva:[], sedacao:[], sedacaoInterm:[], reconc:[], atms:[], culturas:[], interacoes:[], incompat:[], intervencoes:[],
-    acompanhamentos:[], reconciliacoes:[], planoFrasesPadrao:[],
+    acompanhamentos:[], reconciliacoes:[], planoFrasesPadrao:[], condutaFrasesPadrao:[],
     chips
   }, dados);
 }
@@ -842,9 +909,41 @@ function renderLista(){
         <div class="pmeta">Leito ${p.leito||'—'} · ${p.idade||'idade não informada'} ${p.diagnostico? '· '+p.diagnostico : ''}</div>
         ${mesesTxt ? `<div class="pmeta">Acompanhado em: ${mesesTxt}</div>` : ''}
       </div>
-      <button class="btn btn-outline btn-sm" onclick="abrirFicha(${p.id})">Abrir Ficha →</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="abrirFicha(${p.id})">Abrir Ficha →</button>
+        <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="excluirPaciente(${p.id})" title="Excluir ficha">
+          <svg class="ic" viewBox="0 0 20 20"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg>
+        </button>
+      </div>
     </div>`;
   }).join('');
+}
+
+let idParaExcluir = null;
+function excluirPaciente(id){
+  const p = pacientes.find(x=>x.id===id);
+  if(!p) return;
+  idParaExcluir = id;
+  document.getElementById('excluirNomePaciente').textContent = p.nome;
+  document.getElementById('modalExcluir').classList.add('open');
+}
+function fecharModalExcluir(){
+  idParaExcluir = null;
+  document.getElementById('modalExcluir').classList.remove('open');
+}
+async function confirmarExclusao(){
+  const id = idParaExcluir;
+  if(id===null) return;
+  const p = pacientes.find(x=>x.id===id);
+  pacientes = pacientes.filter(x=>x.id!==id);
+  fecharModalExcluir();
+  renderLista();
+  showToast('Ficha excluída.');
+  if(p && !p._novo && equipeSenha){
+    try{
+      await fetch('/api/pacientes', { method:'DELETE', headers: await authHeaders(), body: JSON.stringify({ id }) });
+    }catch(e){ console.warn('Falha ao excluir no banco:', e); }
+  }
 }
 
 function voltarLista(){
@@ -876,11 +975,12 @@ function p_updHeader(campo, valor){
 const CAMPOS_LIVRES = [
   'alergias_quais','ram_quais','hda',
   'rec_fonte','rec_data_admissao','rec_procedencia','rec_data_peso','rec_acesso','rec_orientacao',
+  'rec_unicat_quais','rec_manipulados_quais',
   'hemo_status','vent_fio2','vent_peep','vent_via','dieta_vazao','residuo_volume',
   'tvp_detalhe','ulceraEstresse_detalhe','ulceraCornea_detalhe','corticoide_detalhe','dart_detalhe',
   'uso_previo_atb','historico_culturas','febre_tmax','febre_episodios',
   'ren_cr','ren_ureia','ren_tfg','ren_diurese','exames_lab','exames_img',
-  'lista_medicamentos','plano_terapeutico'
+  'lista_medicamentos','plano_terapeutico','conduta_extra','avaliacao_farmaceutica','recomendacao_farmaceutica'
 ];
 function p_updCampo(campo, valor){
   const p = pacientes.find(x=>x.id===fichaAtivaId);
@@ -935,7 +1035,14 @@ function renderStepContent(){
   document.querySelectorAll('.step-panel').forEach(el=>el.style.display='none');
   document.getElementById('step-'+stepAtivo).style.display='block';
   const p = pacientes.find(x=>x.id===fichaAtivaId);
-  if(stepAtivo===1){ renderChips(p,'alergias','chipsAlergias'); renderChips(p,'ram','chipsRam'); renderReconc(p); renderChips(p,'termoConsentimento','chipsTermoConsentimento'); renderChips(p,'unicat','chipsUnicat'); renderChips(p,'manipulados','chipsManipulados'); }
+  if(stepAtivo===1){
+    renderChips(p,'alergias','chipsAlergias'); renderChips(p,'ram','chipsRam'); renderReconc(p);
+    renderChips(p,'termoConsentimento','chipsTermoConsentimento'); renderChips(p,'unicat','chipsUnicat'); renderChips(p,'manipulados','chipsManipulados');
+    const unicatWrap = document.getElementById('rec_unicat_quais');
+    if(unicatWrap) unicatWrap.style.display = (p.chips.unicat||[]).includes('sim') ? 'block' : 'none';
+    const manipWrap = document.getElementById('rec_manipulados_quais');
+    if(manipWrap) manipWrap.style.display = (p.chips.manipulados||[]).includes('sim') ? 'block' : 'none';
+  }
   if(stepAtivo===2){
     renderChips(p,'dispositivos','chipsDispositivos');
     renderChips(p,'dieta','chipsDieta');
@@ -965,7 +1072,7 @@ function renderStepContent(){
     const dataEl = document.getElementById('int_data');
     if(dataEl && !dataEl.value) dataEl.valueAsDate = new Date();
   }
-  if(stepAtivo===6){ renderCondutaPreview(p); renderChipsFrasesPlano(p); }
+  if(stepAtivo===6){ renderCondutaPreview(p); renderChipsFrasesPlano(p); renderChipsFrasesConduta(p); popularSelectsModelos(); }
 }
 
 function intervencoesDeHoje(p){
@@ -978,13 +1085,36 @@ function renderCondutaPreview(p){
   if(!el) return;
   const deHoje = intervencoesDeHoje(p);
   if(!deHoje.length){
-    el.innerHTML = '<div class="empty" style="padding:16px">Nenhuma intervenção registrada hoje ainda. Volte na aba "Intervenções" para adicionar.</div>';
+    el.innerHTML = '<div class="empty" style="padding:16px">Nenhuma intervenção registrada hoje ainda (veja a aba "Intervenções"). As frases e o texto livre abaixo entram no texto final de qualquer forma.</div>';
     return;
   }
-  el.textContent = deHoje.map((it,idx)=>{
+  el.textContent = 'Intervenções de hoje:\n' + deHoje.map((it,idx)=>{
     const texto = it.descricao && it.descricao.trim() ? it.descricao.trim() : `[${it.categoria}] ${it.motivo} → ${it.sugestao} (${it.status}, contato: ${it.profissional})`;
     return `${idx+1}. ${texto}`;
   }).join('\n');
+}
+
+const FRASES_PADRAO_CONDUTA = [
+  'Realizada avaliação farmacêutica da prescrição médica quanto às doses, diluições, modo de administração, interações e incompatibilidades medicamentos.',
+  'Realizada verificação dos exames laboratoriais e evolução clínica do paciente.',
+  'Monitorado possíveis reações adversas e eventos adversos a medicamentos.',
+  'Realizada participação em discussão de caso em round clínico com equipe multiprofissional.'
+];
+function renderChipsFrasesConduta(p){
+  const el = document.getElementById('chipsFrasesConduta');
+  if(!el) return;
+  if(!p.condutaFrasesPadrao) p.condutaFrasesPadrao = [];
+  el.innerHTML = FRASES_PADRAO_CONDUTA.map((frase,idx)=>{
+    const ativo = p.condutaFrasesPadrao.includes(idx);
+    return `<button class="chip-toggle ${ativo?'active':''}" onclick="toggleFraseConduta(${idx})">${frase}</button>`;
+  }).join('');
+}
+function toggleFraseConduta(idx){
+  const p = pacientes.find(x=>x.id===fichaAtivaId);
+  if(!p.condutaFrasesPadrao) p.condutaFrasesPadrao = [];
+  const pos = p.condutaFrasesPadrao.indexOf(idx);
+  if(pos>=0) p.condutaFrasesPadrao.splice(pos,1); else p.condutaFrasesPadrao.push(idx);
+  renderChipsFrasesConduta(p);
 }
 
 const FRASES_PADRAO_PLANO = [
@@ -1003,6 +1133,156 @@ const FRASES_PADRAO_PLANO = [
   'Monitoro resposta clínica e laboratorial à antibioticoterapia em curso.',
   'Oriento equipe de enfermagem sobre compatibilidade e aprazamento de medicamentos em Y.'
 ];
+
+// ---------- MODELOS PRONTOS (Avaliação-Recomendação-Plano) ----------
+const MODELOS_COMPLETOS = {
+  'Paciente Estável': {
+    avaliacao: ['Avalio estabilidade clínica, com boa tolerância à dieta enteral.','Farmacoterapia sem evidência de interações medicamentosas clinicamente relevantes ou reações adversas no momento.'],
+    recomendacao: [],
+    plano: ['Mantenho acompanhamento farmacoterapêutico diário.','Monitoro aceitação da dieta e sinais de intolerância gastrointestinal. Mantenho acompanhamento da progressão da dieta até a retirada da sonda.']
+  },
+  'Paciente em POI': {
+    avaliacao: ['Farmacoterapia sem evidência de interações medicamentosas clinicamente relevantes ou reações adversas no momento.','Avalio profilaxia antimicrobiana adequada, com indicação mantida pela presença de dreno mediastinal.','Avalio queixa álgica associado à analgesia possivelmente inefetiva.','Avalio ausência de fatores de risco para LAMG.','Avalio quadro de constipação.'],
+    recomendacao: ['Reavaliação da antibioticoprofilaxia diariamente até retirada do dreno.','Sugiro otimização da analgesia.','Sugiro descontinuação do IBP na ausência de indicação atual.'],
+    plano: ['Mantenho acompanhamento farmacoterapêutico diário.','Monitoro parâmetros clínicos e laboratoriais diariamente.','Monitoro sinais de risco infeccioso diariamente até retirada dos dispositivos invasivos.','Monitoro nível de conforto e dor e reavalio em 24h.','Monitoro sinais de intolerância gastrointestinal em 24h.','Monitoro padrão evacuatório e reavalio em 24h.']
+  },
+  'Suspeita de Infecção': {
+    avaliacao: ['Farmacoterapia sem evidência de interações medicamentosas clinicamente relevantes ou reações adversas no momento.','Avalio piora clínica e laboratorial, com suspeita de processo infeccioso. Considero antibioticoterapia adequada, de acordo com indicação empírica para o foco infeccioso atual.','Avalio possibilidade de descalonamento conforme resultado microbiológico.'],
+    recomendacao: ['Sugiro coleta de culturas para investigação microbiológica.','Sugiro reavaliação do esquema antimicrobiano em 72h conforme evolução clínica e resultados microbiológicos.'],
+    plano: ['Mantenho acompanhamento farmacoterapêutico diário.','Monitoro sinais clínicos e laboratoriais e reavalio antibioticoterapia em 72h.','Acompanho parcial das culturas em 72h.']
+  },
+  'IRA (Insuficiência Renal Aguda)': {
+    avaliacao: ['Avalio farmacoterapia sem evidência de interações medicamentosas clinicamente relevantes ou reações adversas no momento.','Avalio alteração da função renal com impacto na farmacoterapia.','Avalio risco de nefrotoxicidade associado aos medicamentos em uso.'],
+    recomendacao: ['Sugiro ajuste posológico conforme função renal.','Sugiro reavaliação de medicamentos com potencial nefrotóxico.'],
+    plano: ['Mantenho acompanhamento farmacoterapêutico diário.','Monitoro sinais clínicos e laboratoriais e reavalio farmacoterapia em 24h, de acordo com a função renal, diurese e balanço hídrico.']
+  },
+  'Desmame de Sedoanalgesia': {
+    avaliacao: ['Avalio farmacoterapia sem evidência de interações medicamentosas clinicamente relevantes ou reações adversas no momento.','Avalio possibilidade de retirada progressiva da sedoanalgesia, com risco de abstinência e delirium.'],
+    recomendacao: ['Sugiro início do desmame progressivo de sedoanalgesia.','Sugiro reavaliação da estratégia de desmame conforme evolução clínica.'],
+    plano: ['Mantenho acompanhamento farmacoterapêutico diário.','Monitoro nível de consciência, sinais de abstinência e delirium e avalio necessidade de ajustes conforme evolução clínica diariamente.','Reavalio resposta ao desmame em 24h.']
+  }
+};
+
+const MODELOS_FARP = {
+  'Sedoanalgesia': {
+    'Otimização': { avaliacao:['Avalio desconforto associado à sedoanalgesia possivelmente insuficiente.','Avalio sedoanalgesia com controle inefetivo, com episódios de agitação, sugerindo necessidade de ajuste.'], recomendacao:['Sugiro otimização da sedoanalgesia.'], plano:['Monitoro nível de sedação, conforto, sinais de abstinência e delirium e reavalio em 12–24h.'] },
+    'Rodízio': { avaliacao:['Avalio necessidade de rodízio de sedoanalgesia.'], recomendacao:['Sugiro rodízio de sedoanalgesia.'], plano:['Monitoro resposta clínica, sinais de abstinência e delirium.'] },
+    'Desmame': { avaliacao:['Avalio possibilidade de retirada progressiva de sedoanalgésicos.'], recomendacao:['Sugiro programação de desmame.'], plano:['Monitoro sinais de abstinência e delirium e reavalio em 24h.'] },
+    'Adequada': { avaliacao:['Avalio sedoanalgesia adequada ao momento clínico.'], recomendacao:['Mantenho esquema atual.'], plano:['Monitoro nível de sedação diariamente.'] }
+  },
+  'Interações Medicamentosas': {
+    'Sem interação': { avaliacao:['De acordo com a farmacoterapia prescrita, não identifico interações medicamentosas clinicamente relevantes.'], recomendacao:[], plano:['Mantenho acompanhamento diário da farmacoterapia.'] },
+    'Com interação': { avaliacao:['Avalio potencial interação entre [fármacos].'], recomendacao:['Sugiro reavaliação da associação medicamentosa.'], plano:['Monitoro efeitos clínicos e laboratoriais em 24–48h.'] }
+  },
+  'Incompatibilidades': {
+    'Com incompatibilidade': { avaliacao:['Avalio risco de incompatibilidade entre medicamentos EV.'], recomendacao:['Sugiro ajuste de via/horário de infusão.'], plano:['Oriento monitorar sinais de obstrução da via ou resistência no acesso venoso. Atentar à presença de precipitação/turvação das soluções.'] },
+    'Sem incompatibilidade': { avaliacao:['Avalio ausência de incompatibilidades relevantes.'], recomendacao:[], plano:[] }
+  },
+  'IBP': {
+    'Sem indicação': { avaliacao:['Avalio ausência de fatores de risco para LAMG.'], recomendacao:['Sugiro descontinuação do IBP na ausência de indicação atual.'], plano:['Monitoro sinais gastrointestinais diariamente.'] },
+    'Com indicação': { avaliacao:['Avalio presença de fatores de risco para LAMG.'], recomendacao:['Sugiro início de profilaxia.'], plano:['Reavalio necessidade diariamente.'] },
+    'Sangramento': { avaliacao:['Avalio sangramento digestivo.'], recomendacao:['Sugiro IBP em dose terapêutica.'], plano:['Monitoro hemoglobina em 24h e reavalio necessidade diariamente.'] }
+  },
+  'Anticoagulação': {
+    'Indicação': { avaliacao:['Avalio indicação de anticoagulação.'], recomendacao:['Sugiro início de anticoagulação.'], plano:['Monitoro parâmetros conforme protocolo.'] },
+    'Inefetiva': { avaliacao:['Avalio parâmetros fora do alvo terapêutico.'], recomendacao:['Sugiro ajuste de dose/esquema.'], plano:['Monitoro parâmetros em 24h.'] },
+    'Risco de sangramento': { avaliacao:['Avalio risco de sangramento associado à anticoagulação.'], recomendacao:['Sugiro reavaliação da terapia.'], plano:['Oriento monitorar sinais de sangramento e reavalio em 24h.'] }
+  },
+  'Dose e/ou PK/PD': {
+    'Subdose': { avaliacao:['Avalio possível subdose terapêutica.'], recomendacao:['Sugiro ajuste de dose.'], plano:['Monitoro resposta clínica em 24–48h.'] },
+    'Sobredose': { avaliacao:['Avalio risco de toxicidade.'], recomendacao:['Sugiro redução de dose.'], plano:['Monitoro sinais clínicos diariamente.'] },
+    'PK/PD otimização': { avaliacao:['Avalio necessidade de otimização da exposição farmacológica.'], recomendacao:['Sugiro infusão estendida/contínua, ajuste de dose ou frequência conforme PK/PD.'], plano:['Monitoro resposta clínica e reavalio em 24–48h.'] },
+    'Ajuste necessário (renal)': { avaliacao:['Avalio alteração da função renal com impacto na farmacoterapia.'], recomendacao:['Sugiro ajuste posológico.'], plano:['Monitoro função renal diariamente.'] }
+  },
+  'RAM': {
+    'Sem RAM': { avaliacao:['Sem suspeitas de reações adversas.'], recomendacao:[], plano:[] },
+    'Suspeita': { avaliacao:['Avalio possível reação adversa a medicamento.'], recomendacao:['Sugiro reavaliação da terapia.'], plano:['Monitoro evolução clínica em 24–48h.'] }
+  },
+  'Antimicrobianos': {
+    'Profilaxia cirúrgica (cardíaca)': { avaliacao:['Avalio profilaxia antimicrobiana adequada.'], recomendacao:[], plano:['Monitoro sinais de risco infeccioso diariamente até retirada do dreno.'] },
+    'Estabilidade clínica': { avaliacao:['Avalio estabilidade clínica associada à melhora de parâmetros laboratoriais e ausência de sinais infecciosos.'], recomendacao:['Sugiro descontinuação da terapia antimicrobiana após XX dias, considerando estabilidade clínica.'], plano:['Monitoro sinais clínicos e laboratoriais após suspensão em 24–48h.'] },
+    'Piora clínica': { avaliacao:['Avalio piora clínica e laboratorial, com suspeita de processo infeccioso.'], recomendacao:['Sugiro coleta de culturas para investigação etiológica.'], plano:['Monitoro sinais clínicos e laboratoriais e acompanho parcial das culturas em 72h.'] },
+    'Empírico com resposta': { avaliacao:['Avalio resposta clínica adequada à terapia antimicrobiana.'], recomendacao:[], plano:['Monitoro sinais clínicos e laboratoriais e reavalio em 48–72h.'] },
+    'Ampliação de espectro': { avaliacao:['Avalio necessidade de ampliação do espectro antimicrobiano conforme evolução clínica/microbiológica.'], recomendacao:['Sugiro escalonamento da terapia antimicrobiana.'], plano:['Monitoro resposta clínica e reavalio em 24–48h.'] },
+    'Redução de espectro': { avaliacao:['Avalio necessidade de redução do espectro antimicrobiano conforme culturas.'], recomendacao:['Sugiro descalonamento da terapia antimicrobiana.'], plano:['Monitoro estabilidade clínica e reavalio em 48h.'] },
+    'Ampliação de cobertura': { avaliacao:['Avalio necessidade de ampliação da cobertura antimicrobiana.'], recomendacao:['Sugiro associação de antimicrobiano (ex: meropenem para Gram-negativos).'], plano:['Monitoro resposta clínica e reavalio em 24–48h.'] },
+    'Dispositivo (foco infeccioso)': { avaliacao:['Avalio possível foco infeccioso associado a dispositivo.'], recomendacao:['Sugiro retirada de dispositivos, considerando risco infeccioso.'], plano:['Monitoro sinais infecciosos em 24–48h.'] },
+    'Pós-cultura': { avaliacao:['Avalio necessidade de ajuste conforme resultado microbiológico.'], recomendacao:['Avalio manutenção da terapia antimicrobiana após resultado de hemoculturas.'], plano:['Reavalio terapia após resultado.'] }
+  },
+  'Vitaminas': {
+    'Suplementação': { avaliacao:['Avalio necessidade de suplementação vitamínica.'], recomendacao:['Sugiro iniciar suplementação vitamínica.'], plano:['Monitoro tolerância gastrointestinal e reavalio em 48–72h.'] }
+  },
+  'Switch Oral': {
+    'Elegível': { avaliacao:['Avalio condições para transição para via oral plena.'], recomendacao:['Sugiro conversão de terapia EV para VO.'], plano:['Monitoro aceitação e tolerância gastrointestinal em 24h.'] }
+  },
+  'Gastrointestinal': {
+    'Intolerância': { avaliacao:['Avalio sinais de intolerância à dieta.'], recomendacao:['Sugiro dieta zero, suspensão de medicamentos VO e substituição para EV.'], plano:['Monitoro tolerância gastrointestinal e reavalio em 24h.'] },
+    'Diarreia': { avaliacao:['Avalio diarreia associada à terapia e/ou dieta.'], recomendacao:['Sugiro suplementação de zinco e uso de probióticos.'], plano:['Monitoro frequência e consistência das evacuações e reavalio em 24-48h.'] },
+    'Constipação': { avaliacao:['Avalio constipação intestinal.'], recomendacao:['Sugiro uso de PEG.'], plano:['Monitoro padrão evacuatório e reavalio em 24-48h.'] },
+    'Náusea/vômito': { avaliacao:['Avalio náuseas e/ou episódios de vômito.'], recomendacao:['Sugiro esquema fixo de antieméticos.'], plano:['Monitoro episódios e aceitação da dieta e reavalio em 24h.'] },
+    'Cólica': { avaliacao:['Avalio cólica abdominal.'], recomendacao:['Sugiro simeticona (Luftal®) ou Colidis®.'], plano:['Monitoro desconforto abdominal e reavalio em 24h.'] }
+  },
+  'Função Hepática': {
+    'Alteração': { avaliacao:['Avalio elevação de enzimas hepáticas.'], recomendacao:['Sugiro reavaliação da farmacoterapia.'], plano:['Monitoro função hepática em 48–72h.'] }
+  },
+  'Exames': {
+    'Necessidade de exames': { avaliacao:['Avalio necessidade de exames de monitorização terapêutica.'], recomendacao:['Sugiro solicitação de exames laboratoriais.'], plano:['Acompanho resultados em 24h e reavalio conduta.'] }
+  },
+  'Profilaxias': {
+    'Úlcera de córnea': { avaliacao:['Avalio risco de lesão de córnea.'], recomendacao:['Sugiro lubrificação ocular.'], plano:['Oriento cuidados oculares e monitoro diariamente.'] },
+    'Úlcera labial': { avaliacao:['Avalio risco de lesão labial.'], recomendacao:['Sugiro proteção labial.'], plano:['Oriento hidratação e monitoro integridade diariamente.'] }
+  }
+};
+
+function popularSelectsModelos(){
+  const selCompleto = document.getElementById('modeloCompletoSelect');
+  if(selCompleto && selCompleto.options.length<=1){
+    Object.keys(MODELOS_COMPLETOS).forEach(nome=>{
+      const opt = document.createElement('option'); opt.value = nome; opt.textContent = nome;
+      selCompleto.appendChild(opt);
+    });
+  }
+  const selCat = document.getElementById('farpCategoriaSelect');
+  if(selCat && selCat.options.length<=1){
+    Object.keys(MODELOS_FARP).forEach(nome=>{
+      const opt = document.createElement('option'); opt.value = nome; opt.textContent = nome;
+      selCat.appendChild(opt);
+    });
+  }
+}
+function atualizarCenariosFarp(){
+  const cat = document.getElementById('farpCategoriaSelect').value;
+  const selCenario = document.getElementById('farpCenarioSelect');
+  if(!cat){ selCenario.innerHTML = '<option value="">Selecione a categoria primeiro</option>'; return; }
+  selCenario.innerHTML = '<option value="">Selecione...</option>' + Object.keys(MODELOS_FARP[cat]).map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+function inserirTextoCampo(id, linhas){
+  if(!linhas || !linhas.length) return;
+  const el = document.getElementById(id);
+  const atual = el.value.trim();
+  const novo = linhas.join('\n');
+  el.value = atual ? atual + '\n' + novo : novo;
+  p_updCampo(id, el.value);
+}
+function inserirModeloCompleto(){
+  const nome = document.getElementById('modeloCompletoSelect').value;
+  if(!nome) return;
+  const m = MODELOS_COMPLETOS[nome];
+  inserirTextoCampo('avaliacao_farmaceutica', m.avaliacao);
+  inserirTextoCampo('recomendacao_farmaceutica', m.recomendacao);
+  inserirTextoCampo('plano_terapeutico', m.plano);
+  showToast(`Modelo "${nome}" inserido.`);
+}
+function inserirModeloFarp(){
+  const cat = document.getElementById('farpCategoriaSelect').value;
+  const cen = document.getElementById('farpCenarioSelect').value;
+  if(!cat || !cen) return;
+  const m = MODELOS_FARP[cat][cen];
+  inserirTextoCampo('avaliacao_farmaceutica', m.avaliacao);
+  inserirTextoCampo('recomendacao_farmaceutica', m.recomendacao);
+  inserirTextoCampo('plano_terapeutico', m.plano);
+  showToast(`Modelo "${cat} — ${cen}" inserido.`);
+}
 
 function renderChipsFrasesPlano(p){
   const el = document.getElementById('chipsFrasesPlano');
@@ -1028,7 +1308,7 @@ function renderChips(p, groupKey, containerId){
     return `<button class="chip-toggle ${ativo?'active':''}" onclick="toggleChip('${groupKey}','${o.k}')">${o.l}</button>`;
   }).join('');
 }
-const GRUPOS_EXCLUSIVOS = ['estadoNeuro','febre','termoConsentimento'];
+const GRUPOS_EXCLUSIVOS = ['estadoNeuro','febre','termoConsentimento','unicat','manipulados'];
 function toggleChip(groupKey, key){
   const p = pacientes.find(x=>x.id===fichaAtivaId);
   const arr = p.chips[groupKey];
@@ -1126,6 +1406,13 @@ function renderSedacaoIntermitente(p){
 function p_updSedacaoInterm(idx,campo,valor){ const p=pacientes.find(x=>x.id===fichaAtivaId); p.sedacaoInterm[idx][campo]=valor; if(campo==='med' || campo==='desmame') renderSedacaoIntermitente(p); }
 function p_delSedacaoInterm(idx){ const p=pacientes.find(x=>x.id===fichaAtivaId); p.sedacaoInterm.splice(idx,1); renderSedacaoIntermitente(p); }
 
+function calcularDTA(inicio){
+  if(!inicio) return '';
+  const dIni = new Date(inicio+'T00:00:00');
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const dias = Math.floor((hoje - dIni) / 86400000) + 1;
+  return dias>=1 ? String(dias) : '';
+}
 function addAtm(){ const p = pacientes.find(x=>x.id===fichaAtivaId); p.atms.push({med:'',via:'',dose:'',intervalo:'',dta:'',inicio:'',tempoTto:'',ajusteRenal:'Não'}); renderAtm(p); }
 function renderAtm(p){
   document.getElementById('atmList').innerHTML = p.atms.map((a,idx)=>`
@@ -1138,8 +1425,8 @@ function renderAtm(p){
       </div>
       <div class="grid g4" style="margin-top:8px">
         <div class="field"><label>Intervalo</label><input type="text" value="${a.intervalo}" placeholder="Ex: 6/6h" oninput="p_updAtm(${idx},'intervalo',this.value)"></div>
-        <div class="field"><label>DTA (Dia de Trat.)</label><input type="text" value="${a.dta}" placeholder="Ex: 2" oninput="p_updAtm(${idx},'dta',this.value)"></div>
-        <div class="field"><label>Início</label><input type="date" value="${a.inicio}" oninput="p_updAtm(${idx},'inicio',this.value)"></div>
+        <div class="field"><label>DTA (calculado)</label><input type="text" value="${calcularDTA(a.inicio)}" readonly style="background:var(--panel-2);color:var(--text-soft)" title="Calculado automaticamente a partir da Data de Início"></div>
+        <div class="field"><label>Início</label><input type="date" value="${a.inicio}" onchange="p_updAtm(${idx},'inicio',this.value); renderAtm(pacientes.find(x=>x.id===fichaAtivaId));"></div>
         <div class="field"><label>Ajuste Renal?</label><select onchange="p_updAtm(${idx},'ajusteRenal',this.value)"><option ${a.ajusteRenal==='Não'?'selected':''}>Não</option><option ${a.ajusteRenal==='Sim'?'selected':''}>Sim</option></select></div>
       </div>
       <div class="field" style="margin-top:8px"><label>Tempo Total de Tratamento</label><input type="text" value="${a.tempoTto}" placeholder="Ex: 7 dias" oninput="p_updAtm(${idx},'tempoTto',this.value)"></div>
@@ -1319,28 +1606,33 @@ function gerarEvolucaoTemplate(p){
   if(partesFrase2.length) frases.push(capitalizar(partesFrase2.join(', ')) + '.');
 
   // --- Dieta / aceitação ---
-  const dietaMapa = {zero:'zero/jejum',oral:'oral',enteral:'enteral',npt:'NPT'};
   const dietaChips = p.chips.dieta||[];
-  if(dietaChips.length){
-    let fDieta = `Dieta ${dietaChips.map(k=>dietaMapa[k]).filter(Boolean).join(', ')}`;
-    const dietaOral = chipsTexto('dietaOral', {via_oral:'via oral',mamadeira:'mamadeira',copinho:'copinho'});
-    const dietaEnteral = chipsTexto('dietaEnteral', {gavagem:'gavagem',bomba:'bomba de infusão'});
-    if(dietaChips.includes('oral') && dietaOral.length) fDieta += ` por ${dietaOral.join(', ')}`;
-    if(dietaChips.includes('enteral') && dietaEnteral.length) fDieta += ` por ${dietaEnteral.join(', ')}`;
-
-    const aceitChips = p.chips.aceitacao||[];
+  const aceitChips = p.chips.aceitacao||[];
+  function textoAceitacao(){
     if(aceitChips.includes('intolerancia')){
-      fDieta += ', com intolerância à dieta';
       const relatos = [];
-      if(aceitChips.includes('residuo') && g('residuo_volume')) relatos.push(`relato de ${g('residuo_volume')} mL de resíduo gástrico`);
-      else if(aceitChips.includes('residuo')) relatos.push('relato de resíduo gástrico');
+      if(aceitChips.includes('residuo') && g('residuo_volume')) relatos.push(`presença de ${g('residuo_volume')} de resíduo gástrico`);
+      else if(aceitChips.includes('residuo')) relatos.push('presença de resíduo gástrico');
       if(aceitChips.includes('regurgitacoes')) relatos.push('relato de regurgitações');
-      if(relatos.length) fDieta += `, com ${relatos.join(' e ')}`;
-    } else if(aceitChips.includes('boa')){
-      fDieta += ', com boa aceitação';
-    } else if(aceitChips.includes('parcial')){
-      fDieta += ', com aceitação parcial';
+      return 'com sinais de intolerância' + (relatos.length? ', '+relatos.join(' e ') : '');
     }
+    if(aceitChips.includes('boa')) return 'com boa aceitação';
+    if(aceitChips.includes('parcial')) return 'com aceitação parcial';
+    return '';
+  }
+  if(dietaChips.includes('zero')){
+    frases.push('Em dieta zero até segunda ordem.');
+  } else if(dietaChips.includes('npt')){
+    frases.push('Em uso de NPT para otimização do aporte nutricional.');
+  } else if(dietaChips.includes('oral') || dietaChips.includes('enteral')){
+    const tipo = dietaChips.includes('oral') ? 'oral' : 'enteral';
+    const submodo = tipo==='oral'
+      ? chipsTexto('dietaOral', {via_oral:'via oral',mamadeira:'mamadeira',copinho:'copinho'})
+      : chipsTexto('dietaEnteral', {gavagem:'gavagem',bomba:'bomba de infusão'});
+    let fDieta = `Dieta ${tipo}`;
+    if(submodo.length) fDieta += ` por ${submodo.join(', ')}`;
+    const aceitTxt = textoAceitacao();
+    if(aceitTxt) fDieta += `, ${aceitTxt}`;
     frases.push(fDieta + '.');
   }
 
@@ -1379,7 +1671,8 @@ function gerarEvolucaoTemplate(p){
       if(a.dose) s += ' '+a.dose;
       if(a.via) s += ' '+a.via;
       if(a.intervalo) s += ' '+a.intervalo;
-      if(a.dta) s += ` (DTA ${a.dta})`;
+      const dta = calcularDTA(a.inicio);
+      if(dta) s += ` (DTA ${dta})`;
       return s;
     });
     frases.push(`Em uso do esquema antimicrobiano com ${itens.join(', ')}.`);
@@ -1402,6 +1695,15 @@ function gerarEvolucaoTemplate(p){
   if(clausesProfilaxia.length){
     frases.push(`Em uso de profilaxia para ${juntarComE(clausesProfilaxia)}.`);
   }
+
+  // --- Exames laboratoriais ---
+  if(g('exames_lab')) frases.push(`Exames laboratoriais: ${g('exames_lab')}.`);
+  if(g('exames_img')) frases.push(`Exames de imagem: ${g('exames_img')}.`);
+
+  // --- Funções eliminatórias (sempre por último, conforme preferência) ---
+  const funcElimMapa = {nausea:'náusea',vomito:'vômito',eliminacoesAusentes:'eliminações intestinais ausentes',eliminacoesPreservadas:'eliminações intestinais preservadas'};
+  const funcElim = chipsTexto('funcoesEliminatorias', funcElimMapa);
+  if(funcElim.length) frases.push(`Apresenta ${funcElim.join(', ')}.`);
 
   const secoes = [];
   secoes.push('1. Evolução Clínica\n' + frases.join(' '));
@@ -1428,22 +1730,35 @@ function gerarEvolucaoTemplate(p){
   }
   secoes.push('3. Interações Medicamentosas e Incompatibilidades\n' + (inter.length? inter.join('\n') : '• Sem interações ou incompatibilidades clinicamente relevantes identificadas.'));
 
-  // ---------- 4/5. CONDUTA FARMACÊUTICA E PLANO TERAPÊUTICO ----------
+  // ---------- 4. AVALIAÇÃO E RECOMENDAÇÃO FARMACÊUTICA ----------
+  if(g('avaliacao_farmaceutica') || g('recomendacao_farmaceutica')){
+    let secaoAR = '4. Avaliação e Recomendação Farmacêutica\n';
+    secaoAR += 'A — Avaliação:\n' + (g('avaliacao_farmaceutica') || '  Não descrita.');
+    secaoAR += '\n\nR — Recomendação:\n' + (g('recomendacao_farmaceutica') || '  —');
+    secoes.push(secaoAR);
+  }
+
+  // ---------- 5. CONDUTA FARMACÊUTICA E PLANO TERAPÊUTICO ----------
   const conduta = [];
   const intervHoje = intervencoesDeHoje(p);
   if(intervHoje.length){
-    intervHoje.forEach((it,idx)=>{
+    intervHoje.forEach((it)=>{
       const texto = it.descricao && it.descricao.trim() ? it.descricao.trim() : `[${it.categoria}] ${it.motivo} → ${it.sugestao} (${it.status}, contato: ${it.profissional})`;
-      conduta.push(`  ${idx+1}. ${texto}`);
+      conduta.push(`  - ${texto}`);
     });
   }
+  const frasesCondutaSelecionadas = (p.condutaFrasesPadrao||[]).map(idx=>`  - ${FRASES_PADRAO_CONDUTA[idx]}`);
+  const condutaExtraTexto = g('conduta_extra');
+  const condutaExtraLinhas = condutaExtraTexto ? condutaExtraTexto.split('\n').filter(l=>l.trim()).map(l=>`  - ${l.trim()}`) : [];
+  const condutaLinhas = [...conduta, ...frasesCondutaSelecionadas, ...condutaExtraLinhas];
+
   const frasesPadraoSelecionadas = (p.planoFrasesPadrao||[]).map(idx=>`  - ${FRASES_PADRAO_PLANO[idx]}`);
   const planoTexto = g('plano_terapeutico');
   const planoLinhasCustom = planoTexto ? planoTexto.split('\n').filter(l=>l.trim()).map(l=>`  - ${l.trim()}`) : [];
   const planoLinhas = [...frasesPadraoSelecionadas, ...planoLinhasCustom];
 
-  let secaoConduta = '4. Conduta Farmacêutica e Plano Terapêutico\n';
-  secaoConduta += '• Conduta Farmacêutica:\n' + (conduta.length? conduta.join('\n') : '  Nenhuma intervenção registrada hoje.');
+  let secaoConduta = '5. Conduta Farmacêutica e Plano Terapêutico\n';
+  secaoConduta += '• Conduta Farmacêutica:\n' + (condutaLinhas.length? condutaLinhas.join('\n') : '  Nenhuma conduta registrada hoje.');
   secaoConduta += '\n\n• Plano Terapêutico Definido:\n' + (planoLinhas.length? planoLinhas.join('\n') : '  Não definido.');
   secoes.push(secaoConduta);
 
@@ -1491,6 +1806,7 @@ function gerarReconciliacaoTemplate(p){
   partes.push('# ANAMNESE FARMACÊUTICA\n' + (g('hda') || 'Não descrita.'));
 
   // ---------- Reconciliação Medicamentosa ----------
+  let reconcTxt;
   if(p.reconc && p.reconc.length){
     const linhas = p.reconc.map(r=>{
       let linha = `- ${r.medicamento||'medicamento não especificado'}`;
@@ -1501,10 +1817,19 @@ function gerarReconciliacaoTemplate(p){
       if(r.dataInicio) linha += ` (iniciado: ${formatarDataBR(r.dataInicio)})`;
       return linha + ';';
     });
-    partes.push('# RECONCILIAÇÃO MEDICAMENTOSA\n' + linhas.join('\n'));
+    reconcTxt = linhas.join('\n');
   } else {
-    partes.push('# RECONCILIAÇÃO MEDICAMENTOSA\nNenhum medicamento de uso domiciliar relatado.');
+    reconcTxt = 'Nenhum medicamento de uso domiciliar relatado.';
   }
+  // Termo de consentimento (uso de medicamento próprio) — logo abaixo da reconciliação
+  const termoSelecionado = (p.chips.termoConsentimento||[])[0];
+  const termoMapa = {
+    aplicado: 'Paciente fará uso de medicamentos próprios durante a internação. Aplicado termo de consentimento. Identifico o medicamento e deixo reservado na gaveta do paciente no posto de enfermagem.',
+    naoAplicava: 'Paciente não fará uso de medicamento próprio durante a internação.',
+    recusou: 'Paciente fará uso de medicamento próprio durante a internação, porém se recusou a assinar termo de consentimento.'
+  };
+  if(termoSelecionado) reconcTxt += '\n\n' + termoMapa[termoSelecionado];
+  partes.push('# RECONCILIAÇÃO MEDICAMENTOSA\n' + reconcTxt);
 
   // ---------- Alergias / RAM ----------
   const alergiasChips = p.chips.alergias||[];
@@ -1520,25 +1845,26 @@ function gerarReconciliacaoTemplate(p){
       : 'Nega alergia a alimentos e corantes;');
   }
   const ramChips = p.chips.ram||[];
-  linhasAlergia.push(ramChips.includes('sim')
+  const textoRam = ramChips.includes('sim')
     ? (g('ram_quais') ? g('ram_quais')+(g('ram_quais').trim().endsWith('.')?'':'.') : 'RAM prévia relatada, sem detalhamento adicional.')
-    : 'Nega RAM prévia.');
+    : 'Nega RAM prévia.';
+  linhasAlergia.push('Histórico de RAM: ' + textoRam);
   partes.push('# ALERGIAS/RECORDATÓRIO DE RAM\n' + linhasAlergia.map(l=>'- '+l.replace(/^-\s*/,'')).join('\n'));
 
   // ---------- Acesso aos Medicamentos ----------
   const unicat = (p.chips.unicat||[])[0];
   const manipulados = (p.chips.manipulados||[])[0];
   let acessoTxt = g('rec_acesso') ? g('rec_acesso') + '\n' : '';
-  acessoTxt += `- MEDICAMENTOS DA UNICAT: ${unicat==='sim'?'Sim':unicat==='nao'?'Não':'—'};\n`;
-  acessoTxt += `- MEDICAMENTOS MANIPULADOS: ${manipulados==='sim'?'Sim':manipulados==='nao'?'Não':'—'};`;
+  acessoTxt += `- MEDICAMENTOS DA UNICAT: ${unicat==='sim'?'Sim':unicat==='nao'?'Não':'—'}${unicat==='sim' && g('rec_unicat_quais')? ' — '+g('rec_unicat_quais') : ''};\n`;
+  acessoTxt += `- MEDICAMENTOS MANIPULADOS: ${manipulados==='sim'?'Sim':manipulados==='nao'?'Não':'—'}${manipulados==='sim' && g('rec_manipulados_quais')? ' — '+g('rec_manipulados_quais') : ''};`;
   partes.push('# ACESSO AOS MEDICAMENTOS\n' + acessoTxt);
 
-  // ---------- Orientação Farmacêutica ----------
-  let orientacaoTxt = g('rec_orientacao') ? g('rec_orientacao')+'\n' : '';
-  orientacaoTxt += 'Farmácia clínica segue acompanhando.';
+  // ---------- Conduta Farmacêutica ----------
+  let condutaTxt = g('rec_orientacao') ? g('rec_orientacao')+'\n' : '';
+  condutaTxt += 'Farmácia clínica segue acompanhando.';
   const assinatura = getAssinatura();
-  if(assinatura) orientacaoTxt += '\n' + assinatura;
-  partes.push('# ORIENTAÇÃO FARMACÊUTICA\n' + orientacaoTxt);
+  if(assinatura) condutaTxt += '\n' + assinatura;
+  partes.push('# CONDUTA FARMACÊUTICA\n' + condutaTxt);
 
   return partes.join('\n');
 }
