@@ -20,11 +20,11 @@ Aplicativo web para acompanhamento farmacoterapêutico em UTI Neonatal, UTI Pedi
 Passo a passo, direto no painel do Netlify:
 
 1. **Ative o banco**: no seu site → aba **Database** → siga o fluxo de criação (é o Postgres gerenciado pelo Netlify/Neon). Isso já configura sozinho a variável de conexão que as funções usam.
-2. **Ative o login da equipe**: no seu site → **Site configuration → Identity → Enable Identity**. Em "Registration preferences", escolha **Invite only** (assim só quem você convidar consegue entrar). Depois, na aba Identity, convide cada farmacêutica pelo e-mail dela.
+2. **Configure a senha da equipe**: em **Project configuration → Environment variables**, crie uma variável `EQUIPE_SENHA` com o valor da senha que todo mundo vai usar para entrar (combine com a equipe qual vai ser).
 3. **Crie a tabela**: depois do deploy, acesse uma vez no navegador:
    `https://SEU-SITE.netlify.app/.netlify/functions/setup-db`
    Deve aparecer uma mensagem confirmando que a tabela foi criada. Só precisa fazer isso uma vez.
-4. **Pronto**: ao abrir o app, vai aparecer uma tela de login. Cada pessoa da equipe entra com o e-mail que você convidou, e todos veem os mesmos pacientes.
+4. **Pronto**: ao abrir o app, vai aparecer uma tela pedindo nome e a senha da equipe. Todo mundo usa a mesma senha; o nome digitado é só para identificar quem criou/alterou cada registro (não é uma conta de verdade, é só um campo de identificação).
 
 ### Migrando dados que já existiam no seu navegador
 

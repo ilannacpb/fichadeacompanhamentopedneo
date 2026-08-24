@@ -7,7 +7,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 <style>
   :root{
     --bg:#F6F8FB; --panel:#FFFFFF; --panel-2:#F4F6FA; --input-bg:#FFFFFF;
@@ -205,9 +204,11 @@
     <svg class="login-pulse" viewBox="0 0 200 34" preserveAspectRatio="none"><path d="M0 17 H70 L80 4 L92 30 L102 12 L110 17 H200"/></svg>
     <div class="login-eyebrow">Farmácia Clínica</div>
     <h1>HMAF — Acompanhamento Farmacoterapêutico</h1>
-    <p class="desc">Entre com sua conta da equipe para acessar os pacientes em acompanhamento.</p>
+    <p class="desc">Entre com seu nome e a senha da equipe para acessar os pacientes.</p>
     <div class="login-tags"><span>UTI Neonatal</span><span>UTI Pediátrica</span><span>UCSIN</span></div>
-    <button class="login-btn" onclick="netlifyIdentity.open()">
+    <div class="field" style="margin-bottom:10px;text-align:left"><input type="text" id="loginNome" placeholder="Seu nome" style="width:100%;padding:12px 14px;border-radius:11px;border:1px solid #E2E8F5;font-size:14px;box-sizing:border-box"></div>
+    <div class="field" style="margin-bottom:16px;text-align:left"><input type="password" id="loginSenha" placeholder="Senha da equipe" style="width:100%;padding:12px 14px;border-radius:11px;border:1px solid #E2E8F5;font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter') tentarLogin()"></div>
+    <button class="login-btn" onclick="tentarLogin()">
       <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="#fff" stroke-width="1.6"><circle cx="10" cy="6.5" r="3.2"/><path d="M3.5 17c0-3.4 3-6 6.5-6s6.5 2.6 6.5 6"/></svg>
       Entrar
     </button>
@@ -226,7 +227,7 @@
     <button class="nav-btn active" data-view="pacientes"><svg class="ic" viewBox="0 0 20 20"><circle cx="10" cy="7" r="3"/><path d="M4 17c0-3 3-5 6-5s6 2 6 5"/></svg> Pacientes</button>
     <button class="nav-btn" data-view="indicadores"><svg class="ic" viewBox="0 0 20 20"><line x1="4" y1="16" x2="4" y2="10"/><line x1="10" y1="16" x2="10" y2="5"/><line x1="16" y1="16" x2="16" y2="12"/><line x1="2" y1="17" x2="18" y2="17"/></svg> Indicadores</button>
     <button class="nav-btn" onclick="abrirModalConfig()"><svg class="ic" viewBox="0 0 20 20"><path d="M12 4a3 3 0 1 0 0 6c.5 0 1-.1 1.4-.3L15 11l1.5-1.5L15 8l1.6-1.6C16.9 6 17 5.5 17 5a3 3 0 0 0-5-2.2"/><circle cx="5" cy="15" r="2"/><line x1="7" y1="13" x2="10.5" y2="9.5"/></svg> Assinatura</button>
-    <button class="nav-btn" onclick="netlifyIdentity.logout()"><svg class="ic" viewBox="0 0 20 20"><path d="M8 4H4v12h4"/><path d="M12 14l4-4-4-4"/><line x1="16" y1="10" x2="7" y2="10"/></svg> Sair</button>
+    <button class="nav-btn" onclick="sairApp()"><svg class="ic" viewBox="0 0 20 20"><path d="M8 4H4v12h4"/><path d="M12 14l4-4-4-4"/><line x1="16" y1="10" x2="7" y2="10"/></svg> Sair</button>
   </div>
 </div>
 
@@ -1892,34 +1893,43 @@ async function exportarExcel(){
   showToast('Planilha exportada com sucesso!');
 }
 
-// ---------- PERSISTÊNCIA EM BANCO DE DADOS (Netlify DB + Identity) ----------
-let netlifyUser = null;
+// ---------- PERSISTÊNCIA EM BANCO DE DADOS (senha única da equipe) ----------
+let equipeSenha = null;
+let equipeNome = null;
+const AUTH_STORAGE_SENHA = 'farmacia_clinica_equipe_senha';
+const AUTH_STORAGE_NOME = 'farmacia_clinica_equipe_nome';
 
 async function authHeaders(){
-  const headers = { 'Content-Type': 'application/json' };
-  if(netlifyUser){
-    try{ const token = await netlifyUser.jwt(); headers['Authorization'] = 'Bearer ' + token; }catch(e){}
-  }
-  return headers;
+  return {
+    'Content-Type': 'application/json',
+    'X-Team-Password': equipeSenha || '',
+    'X-Team-Name': equipeNome || ''
+  };
 }
 
 async function carregarEstado(){
-  if(!netlifyUser) return;
+  if(!equipeSenha) return;
   try{
     const resp = await fetch('/api/pacientes', { headers: await authHeaders() });
+    if(resp.status === 401) throw new Error('senha_invalida');
     if(!resp.ok) throw new Error('Erro ' + resp.status);
     pacientes = await resp.json();
     renderLista();
     const ind = document.getElementById('autosaveInd');
     if(ind) ind.textContent = 'Sincronizado ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
   } catch(e){
+    if(e.message === 'senha_invalida'){
+      mostrarErroLogin('Senha da equipe incorreta.');
+      sairApp();
+      return;
+    }
     console.warn('Falha ao carregar pacientes do banco:', e);
     showToast('Não foi possível carregar os dados do banco. Verifique sua conexão e se o banco foi configurado (veja /.netlify/functions/setup-db).');
   }
 }
 
 async function salvarEstado(){
-  if(!netlifyUser || !pacientes.length) return;
+  if(!equipeSenha || !pacientes.length) return;
   try{
     const headers = await authHeaders();
     for(const p of pacientes){
@@ -1950,21 +1960,51 @@ function esconderLoginGate(){
 function mostrarLoginGate(){
   document.getElementById('loginGate').style.display = 'flex';
 }
-async function aoLogar(user){
-  netlifyUser = user;
-  document.getElementById('usuarioLogado').textContent = user.email;
-  esconderLoginGate();
-  await carregarEstado();
+function mostrarErroLogin(msg){
+  const el = document.getElementById('loginErro');
+  if(el){ el.textContent = msg; el.style.display = 'block'; }
 }
 
-netlifyIdentity.on('init', user => { if(user) aoLogar(user); else mostrarLoginGate(); });
-netlifyIdentity.on('login', user => { netlifyIdentity.close(); aoLogar(user); });
-netlifyIdentity.on('logout', () => { netlifyUser = null; pacientes = []; document.getElementById('usuarioLogado').textContent = ''; mostrarLoginGate(); });
-netlifyIdentity.on('error', err => {
-  const el = document.getElementById('loginErro');
-  if(el){ el.textContent = 'Erro no login: ' + (err && err.message ? err.message : 'tente novamente.'); el.style.display = 'block'; }
-});
-netlifyIdentity.init();
+async function tentarLogin(){
+  const nome = document.getElementById('loginNome').value.trim();
+  const senha = document.getElementById('loginSenha').value;
+  if(!nome || !senha){ mostrarErroLogin('Preencha seu nome e a senha da equipe.'); return; }
+  equipeSenha = senha; equipeNome = nome;
+  try{
+    const resp = await fetch('/api/pacientes', { headers: await authHeaders() });
+    if(resp.status === 401){ mostrarErroLogin('Senha da equipe incorreta.'); equipeSenha = null; return; }
+    if(!resp.ok) throw new Error('Erro ' + resp.status);
+    pacientes = await resp.json();
+    try{ localStorage.setItem(AUTH_STORAGE_SENHA, senha); localStorage.setItem(AUTH_STORAGE_NOME, nome); }catch(e){}
+    document.getElementById('usuarioLogado').textContent = nome;
+    esconderLoginGate();
+    renderLista();
+  } catch(e){
+    mostrarErroLogin('Não foi possível conectar ao banco. Tente novamente em instantes.');
+    equipeSenha = null;
+  }
+}
+
+function sairApp(){
+  equipeSenha = null; equipeNome = null; pacientes = [];
+  try{ localStorage.removeItem(AUTH_STORAGE_SENHA); localStorage.removeItem(AUTH_STORAGE_NOME); }catch(e){}
+  document.getElementById('usuarioLogado').textContent = '';
+  document.getElementById('loginSenha').value = '';
+  mostrarLoginGate();
+}
+
+// Tenta entrar automaticamente se já havia login salvo neste navegador
+(function tentarLoginSalvo(){
+  try{
+    const senhaSalva = localStorage.getItem(AUTH_STORAGE_SENHA);
+    const nomeSalvo = localStorage.getItem(AUTH_STORAGE_NOME);
+    if(senhaSalva && nomeSalvo){
+      document.getElementById('loginNome').value = nomeSalvo;
+      document.getElementById('loginSenha').value = senhaSalva;
+      tentarLogin();
+    }
+  } catch(e){}
+})();
 
 function exportarBackup(){
   salvarEstado();

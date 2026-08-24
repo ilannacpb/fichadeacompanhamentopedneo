@@ -1,10 +1,13 @@
-// API de pacientes. Exige login (Netlify Identity) — o front-end manda o token
-// da usuária logada no cabeçalho Authorization, e o Netlify já decodifica isso
-// automaticamente em context.clientContext.user.
-exports.handler = async (event, context) => {
-  const user = context.clientContext && context.clientContext.user;
-  if (!user) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Não autenticado. Faça login para continuar.' }) };
+// API de pacientes. Protegida por uma senha única compartilhada da equipe
+// (variável de ambiente EQUIPE_SENHA), enviada pelo front-end no cabeçalho
+// X-Team-Password a cada chamada. O nome de quem está usando (X-Team-Name)
+// é auto-declarado (não autenticado) e usado só para fins de registro.
+exports.handler = async (event) => {
+  const senhaEnviada = event.headers['x-team-password'];
+  const nomeUsuario = event.headers['x-team-name'] || 'Desconhecido';
+
+  if (!senhaEnviada || senhaEnviada !== process.env.EQUIPE_SENHA) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Senha da equipe incorreta.' }) };
   }
 
   try {
@@ -21,7 +24,7 @@ exports.handler = async (event, context) => {
       const dados = JSON.parse(event.body);
       const rows = await db.sql`
         INSERT INTO pacientes (dados, criado_por, atualizado_por)
-        VALUES (${JSON.stringify(dados)}::jsonb, ${user.email}, ${user.email})
+        VALUES (${JSON.stringify(dados)}::jsonb, ${nomeUsuario}, ${nomeUsuario})
         RETURNING id
       `;
       return { statusCode: 200, body: JSON.stringify({ id: rows[0].id }) };
@@ -32,7 +35,7 @@ exports.handler = async (event, context) => {
       if (!id) return { statusCode: 400, body: JSON.stringify({ error: 'id é obrigatório para atualizar.' }) };
       await db.sql`
         UPDATE pacientes
-        SET dados = ${JSON.stringify(dados)}::jsonb, atualizado_por = ${user.email}, atualizado_em = now()
+        SET dados = ${JSON.stringify(dados)}::jsonb, atualizado_por = ${nomeUsuario}, atualizado_em = now()
         WHERE id = ${id}
       `;
       return { statusCode: 200, body: JSON.stringify({ ok: true }) };
