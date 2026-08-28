@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 <style>
   :root{
     --bg:#F6F8FB; --panel:#FFFFFF; --panel-2:#F4F6FA; --input-bg:#FFFFFF;
@@ -238,6 +239,7 @@
       <h2>Pacientes</h2>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span id="autosaveInd" style="font-size:11px;color:var(--text-dim)">Dados salvos neste navegador</span>
+        <button class="btn btn-outline btn-sm" onclick="exportarResumoVisita().catch(err=>showToast('Erro ao gerar documento: '+err.message))">📋 Resumo p/ Visita (Word)</button>
         <button class="btn btn-outline btn-sm" onclick="exportarBackup()">Baixar Backup</button>
         <label class="btn btn-outline btn-sm" style="cursor:pointer">Restaurar Backup<input type="file" accept="application/json" style="display:none" onchange="importarBackup(this)"></label>
         <button class="btn btn-teal" onclick="abrirModalNovo()">+ Novo Paciente</button>
@@ -254,6 +256,11 @@
         <div class="field"><label>Filtrar por Mês</label><select id="filtroMesAlta" onchange="renderLista()"><option value="">Todos os meses</option></select></div>
         <div style="display:flex;align-items:flex-end"><div class="lp-metric" style="width:100%"><div class="lbl">PACIENTES ACOMPANHADOS NO PERÍODO</div><div class="num num-dark" id="contagemMesAlta">0</div></div></div>
       </div>
+    </div>
+
+    <div class="panel-card" id="resumoReconciliacaoWrap">
+      <h4><svg class="ic" viewBox="0 0 20 20"><path d="M4 10a6 6 0 0 1 10-4.5M16 4v4h-4"/><path d="M16 10a6 6 0 0 1-10 4.5M4 16v-4h4"/></svg> Status de Reconciliação Medicamentosa <span id="resumoReconciliacaoContagem" style="font-weight:400;font-size:12px;color:var(--text-soft)"></span></h4>
+      <div id="resumoReconciliacaoLista" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
     </div>
 
     <div class="plist" id="plist"></div>
@@ -330,13 +337,21 @@
 
       <div class="panel-card">
         <h4><svg class="ic" viewBox="0 0 20 20"><path d="M4 10a6 6 0 0 1 10-4.5M16 4v4h-4"/><path d="M16 10a6 6 0 0 1-10 4.5M4 16v-4h4"/></svg> Reconciliação Medicamentosa</h4>
-        <div class="field"><label>Fonte dos Dados</label>
-          <select id="rec_fonte" onchange="p_updCampo('rec_fonte',this.value)"><option>Paciente</option><option>Acompanhante/Familiar</option><option>Receituário Médico</option><option>Prontuário Anterior</option><option>Unidade Básica</option></select>
+        <div class="field"><label>Uso de Medicamento Domiciliar <span style="font-weight:400;font-size:11px;color:var(--text-soft);text-transform:none">(preencher marca a reconciliação como feita)</span></label>
+          <div class="chip-row" id="chipsUsoDomiciliar"></div>
         </div>
-        <div class="field" style="margin-top:12px"><label>Termo de Consentimento (Uso de Medicamento Próprio)</label><div class="chip-row" id="chipsTermoConsentimento"></div></div>
-        <div class="row-header" style="margin-top:14px"><label style="margin:0">Medicamentos de Uso Domiciliar</label>
-          <button class="btn btn-mint btn-sm" onclick="addReconc()">+ Adicionar Medicamento</button></div>
-        <div id="reconcList"></div>
+        <div id="reconcStatusVazio" class="empty" style="padding:14px;margin-top:10px;display:none">⏳ Reconciliação ainda não realizada — selecione uma das opções acima.</div>
+        <div id="reconcConteudo" style="display:none">
+          <div class="field" style="margin-top:14px"><label>Fonte dos Dados</label>
+            <select id="rec_fonte" onchange="p_updCampo('rec_fonte',this.value)"><option>Paciente</option><option>Acompanhante/Familiar</option><option>Receituário Médico</option><option>Prontuário Anterior</option><option>Unidade Básica</option></select>
+          </div>
+          <div id="reconcUsavaBloco" style="display:none">
+            <div class="field" style="margin-top:12px"><label>Termo de Consentimento (Uso de Medicamento Próprio)</label><div class="chip-row" id="chipsTermoConsentimento"></div></div>
+            <div class="row-header" style="margin-top:14px"><label style="margin:0">Medicamentos de Uso Domiciliar</label>
+              <button class="btn btn-mint btn-sm" onclick="addReconc()">+ Adicionar Medicamento</button></div>
+            <div id="reconcList"></div>
+          </div>
+        </div>
       </div>
 
       <div class="panel-card">
@@ -373,6 +388,7 @@
 
         <div class="field" style="margin-top:12px"><label>Aceitação</label><div class="chip-row" id="chipsAceitacao"></div></div>
         <div class="field" id="residuoVolumeSub" style="margin-top:10px;display:none"><label>Volume do Resíduo</label><input type="text" id="residuo_volume" placeholder="Ex: 20 mL/24h" oninput="p_updCampo('residuo_volume',this.value)"></div>
+        <div class="field" id="regurgitacoesDetalheSub" style="margin-top:10px;display:none"><label>Detalhe das Regurgitações</label><input type="text" id="regurgitacoes_detalhe" placeholder="Ex: 3 episódios/24h" oninput="p_updCampo('regurgitacoes_detalhe',this.value)"></div>
       </div>
       <div class="panel-card">
         <h4><svg class="ic" viewBox="0 0 20 20"><path d="M10 17S3 12 3 7.5A3.5 3.5 0 0 1 10 6a3.5 3.5 0 0 1 7 1.5C17 12 10 17 10 17z"/></svg> Funções Eliminatórias</h4>
@@ -410,7 +426,8 @@
 
       <div class="panel-card">
         <h4><svg class="ic" viewBox="0 0 20 20"><path d="M10 17S3 12 3 7.5A3.5 3.5 0 0 1 10 6a3.5 3.5 0 0 1 7 1.5C17 12 10 17 10 17z"/></svg> Função Renal</h4>
-        <div class="grid g4">
+        <div class="field"><label>Status da Função Renal</label><div class="chip-row" id="chipsStatusRenal"></div></div>
+        <div class="grid g4" style="margin-top:10px">
           <div class="field"><label>Creatinina</label><input type="text" id="ren_cr" oninput="p_updCampo('ren_cr',this.value)"></div>
           <div class="field"><label>Ureia</label><input type="text" id="ren_ureia" oninput="p_updCampo('ren_ureia',this.value)"></div>
           <div class="field"><label>TFG (Schwartz)</label><input type="text" id="ren_tfg" placeholder="mL/min/1.73m²" oninput="p_updCampo('ren_tfg',this.value)"></div>
@@ -712,10 +729,11 @@ const TAXONOMIA = {
 const MEDS_DVA = ["Adrenalina","Noradrenalina","Dobutamina","Dopamina","Milrinona","Vasopressina","Alprostadil","Nitroglicerina","Nitroprussiato","Amiodarona","Lidocaína","Outro"];
 const MEDS_SEDACAO = ["Fentanil","Dexmedetomidina","Morfina","Midazolam","Rocurônio","Escetamina","Propofol","Clonidina","Outro"];
 const MEDS_SEDACAO_INTERM = ["Dipirona","Cetorolaco","Cetoprofeno","Ibuprofeno","Paracetamol","Lorazepam","Clonidina","Metadona","Morfina","Tramadol","Gabapentina","Outros"];
-const CULTURA_RESULTADO_PARCIAL = ["Levedura","BGN","CGP","Fungo Filamentoso"];
-const CULTURA_PADRAO_RESISTENCIA = ["MDR","XDR","PDR"];
-const CULTURA_FENOTIPO = ["KPC","MRSA","ESBL","VIM","NDM","AmpC","MSSA","VRE","OXA-48"];
-const CULTURA_RESULTADO_FINAL = ["Negativo","Positivo"];
+const CULTURA_MATERIAL = ["Hemocultura","Urocultura","Cultura de Ponta de Cateter","Cultura de Secreção Traqueal","Lavado Broncoalveolar","Líquor","Coprocultura","Cultura de Secreção de Ferida Operatória","Cultura de Líquido Pleural","Cultura de Líquido Ascítico","Swab Retal","Swab Nasal","Outro"];
+const CULTURA_RESULTADO_PARCIAL = ["Levedura","BGN","CGP","Fungo Filamentoso","E/A (Em Andamento)"];
+const CULTURA_PADRAO_RESISTENCIA = ["","MDR","XDR","PDR"];
+const CULTURA_FENOTIPO = ["","KPC","MRSA","ESBL","VIM","NDM","AmpC","MSSA","VRE","OXA-48"];
+const CULTURA_RESULTADO_FINAL = ["Negativo","Positivo","E/A (Em Andamento)"];
 const STEP_ICONS = {1:'alert',2:'gauge',3:'bug',4:'alert',5:'folder',6:'clipboard'};
 const ICON_SVGS = {
   alert:'<path d="M10 3l8 14H2z"/><line x1="10" y1="8" x2="10" y2="12"/><circle cx="10" cy="14.6" r="0.9" fill="currentColor" stroke="none"/>',
@@ -759,7 +777,9 @@ const CHIP_GROUPS = {
   febre: [{k:'afebril',l:'Afebril'},{k:'febre',l:'Febre'}],
   termoConsentimento: [{k:'aplicado',l:'Aplicado termo de consentimento'},{k:'recusou',l:'Recusou assinar'},{k:'naoAplicava',l:'Não se aplicava'}],
   unicat: [{k:'sim',l:'Sim'},{k:'nao',l:'Não'}],
-  manipulados: [{k:'sim',l:'Sim'},{k:'nao',l:'Não'}]
+  manipulados: [{k:'sim',l:'Sim'},{k:'nao',l:'Não'}],
+  statusRenal: [{k:'preservada',l:'Preservada'},{k:'piora',l:'Em Piora'},{k:'melhora',l:'Em Melhora'}],
+  usoDomiciliar: [{k:'nao_usava',l:'Paciente não fazia uso de medicamentos'},{k:'usava',l:'Paciente fazia uso de medicamentos'}]
 };
 
 let pacientes = [];
@@ -837,6 +857,9 @@ function registrarReconciliacao(p){
   if(!p.reconciliacoes) p.reconciliacoes = [];
   if(!p.reconciliacoes.some(r=>r.data===hoje)) p.reconciliacoes.push({ data: hoje, setor: p.setor });
 }
+function reconciliacaoFoiFeita(p){
+  return !!(p.chips.usoDomiciliar && p.chips.usoDomiciliar.length);
+}
 
 function criarPaciente(){
   const nome = document.getElementById('np_nome').value.trim();
@@ -869,7 +892,29 @@ function mesesAcompanhados(p){
   return [...new Set((p.acompanhamentos||[]).map(d=>d.slice(0,7)))].sort();
 }
 
+function renderResumoReconciliacao(){
+  const wrap = document.getElementById('resumoReconciliacaoWrap');
+  if(!wrap) return;
+  if(abaPacientesAtual !== 'ativos'){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+
+  const ativos = pacientes.filter(p=>p.status==='Ativo');
+  const reconciliados = ativos.filter(reconciliacaoFoiFeita);
+  const pendentes = ativos.filter(p=>!reconciliacaoFoiFeita(p));
+
+  document.getElementById('resumoReconciliacaoContagem').textContent = `(${reconciliados.length} de ${ativos.length} reconciliados)`;
+
+  const el = document.getElementById('resumoReconciliacaoLista');
+  if(!ativos.length){ el.innerHTML = '<span style="font-size:12.5px;color:var(--text-soft)">Nenhum paciente em acompanhamento.</span>'; return; }
+
+  const chipReconciliado = p => `<span class="chip-toggle active" style="background:#DCFCE7;border-color:#BBF7D0;color:#166534;cursor:pointer" onclick="abrirFicha(${p.id})">✅ ${p.nome}</span>`;
+  const chipPendente = p => `<span class="chip-toggle" style="background:#FEF3C7;border-color:#FDE68A;color:#92400E;cursor:pointer" onclick="abrirFicha(${p.id})">⏳ ${p.nome}</span>`;
+
+  el.innerHTML = reconciliados.map(chipReconciliado).join('') + pendentes.map(chipPendente).join('');
+}
+
 function renderLista(){
+  renderResumoReconciliacao();
   const lista = document.getElementById('plist');
   let pacientesFiltrados = pacientes.filter(p => abaPacientesAtual==='ativos' ? p.status==='Ativo' : p.status==='Alta');
 
@@ -976,7 +1021,7 @@ const CAMPOS_LIVRES = [
   'alergias_quais','ram_quais','hda',
   'rec_fonte','rec_data_admissao','rec_procedencia','rec_data_peso','rec_acesso','rec_orientacao',
   'rec_unicat_quais','rec_manipulados_quais',
-  'hemo_status','vent_fio2','vent_peep','vent_via','dieta_vazao','residuo_volume',
+  'hemo_status','vent_fio2','vent_peep','vent_via','dieta_vazao','residuo_volume','regurgitacoes_detalhe',
   'tvp_detalhe','ulceraEstresse_detalhe','ulceraCornea_detalhe','corticoide_detalhe','dart_detalhe',
   'uso_previo_atb','historico_culturas','febre_tmax','febre_episodios',
   'ren_cr','ren_ureia','ren_tfg','ren_diurese','exames_lab','exames_img',
@@ -1038,10 +1083,19 @@ function renderStepContent(){
   if(stepAtivo===1){
     renderChips(p,'alergias','chipsAlergias'); renderChips(p,'ram','chipsRam'); renderReconc(p);
     renderChips(p,'termoConsentimento','chipsTermoConsentimento'); renderChips(p,'unicat','chipsUnicat'); renderChips(p,'manipulados','chipsManipulados');
+    renderChips(p,'usoDomiciliar','chipsUsoDomiciliar');
     const unicatWrap = document.getElementById('rec_unicat_quais');
     if(unicatWrap) unicatWrap.style.display = (p.chips.unicat||[]).includes('sim') ? 'block' : 'none';
     const manipWrap = document.getElementById('rec_manipulados_quais');
     if(manipWrap) manipWrap.style.display = (p.chips.manipulados||[]).includes('sim') ? 'block' : 'none';
+
+    const usoDom = (p.chips.usoDomiciliar||[])[0];
+    const vazioEl = document.getElementById('reconcStatusVazio');
+    const conteudoEl = document.getElementById('reconcConteudo');
+    const usavaBloco = document.getElementById('reconcUsavaBloco');
+    if(vazioEl) vazioEl.style.display = usoDom ? 'none' : 'block';
+    if(conteudoEl) conteudoEl.style.display = usoDom ? 'block' : 'none';
+    if(usavaBloco) usavaBloco.style.display = usoDom==='usava' ? 'block' : 'none';
   }
   if(stepAtivo===2){
     renderChips(p,'dispositivos','chipsDispositivos');
@@ -1053,7 +1107,7 @@ function renderStepContent(){
     atualizarVisibilidadeDieta(p);
     renderDva(p); renderChips(p,'ventilacao','chipsVentilacao'); renderChips(p,'sedoanalgesia','chipsSedoanalgesia'); renderSedacao(p);
     renderSedacaoIntermitente(p); renderChips(p,'estadoNeuro','chipsEstadoNeuro');
-    renderChips(p,'ajusteRenal','chipsAjusteRenal');
+    renderChips(p,'ajusteRenal','chipsAjusteRenal'); renderChips(p,'statusRenal','chipsStatusRenal');
     const viaWrap = document.getElementById('vent_via_wrap');
     if(viaWrap) viaWrap.style.display = (p.chips.ventilacao||[]).includes('vmi') ? 'block' : 'none';
     renderChips(p,'tvp','chipsTvp'); renderChips(p,'ulceraEstresse','chipsUlceraEstresse'); renderChips(p,'ulceraCornea','chipsUlceraCornea');
@@ -1308,7 +1362,7 @@ function renderChips(p, groupKey, containerId){
     return `<button class="chip-toggle ${ativo?'active':''}" onclick="toggleChip('${groupKey}','${o.k}')">${o.l}</button>`;
   }).join('');
 }
-const GRUPOS_EXCLUSIVOS = ['estadoNeuro','febre','termoConsentimento','unicat','manipulados'];
+const GRUPOS_EXCLUSIVOS = ['estadoNeuro','febre','termoConsentimento','unicat','manipulados','statusRenal','usoDomiciliar'];
 function toggleChip(groupKey, key){
   const p = pacientes.find(x=>x.id===fichaAtivaId);
   const arr = p.chips[groupKey];
@@ -1317,6 +1371,9 @@ function toggleChip(groupKey, key){
     p.chips[groupKey] = idx>=0 ? [] : [key];
   } else {
     if(idx>=0) arr.splice(idx,1); else arr.push(key);
+  }
+  if(groupKey==='usoDomiciliar' && p.chips.usoDomiciliar.length){
+    registrarReconciliacao(p);
   }
   renderStepContent();
 }
@@ -1332,6 +1389,8 @@ function atualizarVisibilidadeDieta(p){
   const aceit = p.chips.aceitacao||[];
   const residuoEl = document.getElementById('residuoVolumeSub');
   if(residuoEl) residuoEl.style.display = aceit.includes('residuo') ? 'block':'none';
+  const regurgEl = document.getElementById('regurgitacoesDetalheSub');
+  if(regurgEl) regurgEl.style.display = aceit.includes('regurgitacoes') ? 'block':'none';
 }
 
 function addReconc(){ const p = pacientes.find(x=>x.id===fichaAtivaId); p.reconc.push({medicamento:'', concentracao:'', dose:'', via:'', frequencia:'', dataInicio:''}); renderReconc(p); }
@@ -1435,23 +1494,23 @@ function renderAtm(p){
 function p_updAtm(idx,campo,valor){ pacientes.find(x=>x.id===fichaAtivaId).atms[idx][campo]=valor; }
 function p_delAtm(idx){ const p=pacientes.find(x=>x.id===fichaAtivaId); p.atms.splice(idx,1); renderAtm(p); }
 
-function addCultura(){ const p = pacientes.find(x=>x.id===fichaAtivaId); p.culturas.push({material:'',dataColeta:'',resParcial:CULTURA_RESULTADO_PARCIAL[0],identificacaoAgente:'',resultadoFinal:CULTURA_RESULTADO_FINAL[0],padrao:CULTURA_PADRAO_RESISTENCIA[0],fenotipo:CULTURA_FENOTIPO[0],tsa:''}); renderCultura(p); }
+function addCultura(){ const p = pacientes.find(x=>x.id===fichaAtivaId); p.culturas.push({material:CULTURA_MATERIAL[0],dataColeta:'',resParcial:'E/A (Em Andamento)',identificacaoAgente:'',resultadoFinal:'E/A (Em Andamento)',padrao:'',fenotipo:'',tsa:''}); renderCultura(p); }
 function renderCultura(p){
   document.getElementById('culturaList').innerHTML = p.culturas.map((c,idx)=>`
     <div class="entry-card">
       <div class="top-row"><button class="trash" onclick="p_delCult(${idx})"><svg class="ic" viewBox="0 0 20 20"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg></button></div>
       <div class="grid g3">
-        <div class="field"><label>Material</label><input type="text" value="${c.material}" placeholder="Ex: Hemocultura" oninput="p_updCult(${idx},'material',this.value)"></div>
+        <div class="field"><label>Material</label><select onchange="p_updCult(${idx},'material',this.value)">${CULTURA_MATERIAL.map(o=>`<option ${o===c.material?'selected':''}>${o}</option>`).join('')}</select></div>
         <div class="field"><label>Data Coleta</label><input type="date" value="${c.dataColeta}" oninput="p_updCult(${idx},'dataColeta',this.value)"></div>
         <div class="field"><label>Resultado Parcial</label><select onchange="p_updCult(${idx},'resParcial',this.value)">${CULTURA_RESULTADO_PARCIAL.map(o=>`<option ${o===c.resParcial?'selected':''}>${o}</option>`).join('')}</select></div>
       </div>
       <div class="grid g3" style="margin-top:8px">
         <div class="field"><label>Identificação do Agente</label><input type="text" placeholder="Ex: Streptococcus pneumoniae" value="${c.identificacaoAgente}" oninput="p_updCult(${idx},'identificacaoAgente',this.value)"></div>
         <div class="field"><label>Resultado Final</label><select onchange="p_updCult(${idx},'resultadoFinal',this.value)">${CULTURA_RESULTADO_FINAL.map(o=>`<option ${o===c.resultadoFinal?'selected':''}>${o}</option>`).join('')}</select></div>
-        <div class="field"><label>Padrão de Resistência</label><select onchange="p_updCult(${idx},'padrao',this.value)">${CULTURA_PADRAO_RESISTENCIA.map(o=>`<option ${o===c.padrao?'selected':''}>${o}</option>`).join('')}</select></div>
+        <div class="field"><label>Padrão de Resistência</label><select onchange="p_updCult(${idx},'padrao',this.value)">${CULTURA_PADRAO_RESISTENCIA.map(o=>`<option ${o===c.padrao?'selected':''}>${o||'— (em branco)'}</option>`).join('')}</select></div>
       </div>
       <div class="grid g2" style="margin-top:8px">
-        <div class="field"><label>Fenótipo</label><select onchange="p_updCult(${idx},'fenotipo',this.value)">${CULTURA_FENOTIPO.map(o=>`<option ${o===c.fenotipo?'selected':''}>${o}</option>`).join('')}</select></div>
+        <div class="field"><label>Fenótipo</label><select onchange="p_updCult(${idx},'fenotipo',this.value)">${CULTURA_FENOTIPO.map(o=>`<option ${o===c.fenotipo?'selected':''}>${o||'— (em branco)'}</option>`).join('')}</select></div>
         <div class="field"><label>TSA / Sensibilidade</label><input type="text" value="${c.tsa}" oninput="p_updCult(${idx},'tsa',this.value)"></div>
       </div>
     </div>`).join('') || '<div class="empty" style="padding:16px">Nenhuma cultura adicionada.</div>';
@@ -1549,6 +1608,18 @@ function juntarComE(lista){
   return lista.slice(0,-1).join(', ') + ' e ' + lista[lista.length-1];
 }
 
+function gerarCabecalhoEvolucao(p){
+  const hoje = formatarDataBR(new Date().toISOString().slice(0,10));
+  let cab = `# EVOLUÇÃO FARMACÊUTICA - ${hoje} #\n`;
+  cab += `Nome: ${p.nome}\n`;
+  cab += `Idade: ${p.idade||'—'}\n`;
+  cab += `Peso: ${p.peso? p.peso+'kg':'—'}    Altura: ${p.estatura? p.estatura+'cm':'—'}\n`;
+  cab += `FIA: ${p.prontuario||'—'}\n`;
+  if(isNeo(p.setor)) cab += `IG: ${p.ig||'—'}    IGC: ${p.igc||'—'}\n`;
+  cab += `Diagnóstico: ${p.diagnostico||'—'}`;
+  return cab;
+}
+
 function gerarEvolucaoTemplate(p){
   const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
   const chipsTexto = (grupo, mapa) => (p.chips[grupo]||[]).map(k=>mapa[k]).filter(Boolean);
@@ -1605,25 +1676,25 @@ function gerarEvolucaoTemplate(p){
   const partesFrase2 = [fVent, fNeuro, fSedo].filter(Boolean);
   if(partesFrase2.length) frases.push(capitalizar(partesFrase2.join(', ')) + '.');
 
-  // --- Dieta / aceitação ---
+  // --- Dieta / aceitação (aceitação sempre incluída, mesmo em dieta zero/NPT) ---
   const dietaChips = p.chips.dieta||[];
   const aceitChips = p.chips.aceitacao||[];
   function textoAceitacao(){
     if(aceitChips.includes('intolerancia')){
       const relatos = [];
-      if(aceitChips.includes('residuo') && g('residuo_volume')) relatos.push(`presença de ${g('residuo_volume')} de resíduo gástrico`);
-      else if(aceitChips.includes('residuo')) relatos.push('presença de resíduo gástrico');
-      if(aceitChips.includes('regurgitacoes')) relatos.push('relato de regurgitações');
+      if(aceitChips.includes('residuo')) relatos.push(g('residuo_volume') ? `presença de ${g('residuo_volume')} de resíduo gástrico` : 'presença de resíduo gástrico');
+      if(aceitChips.includes('regurgitacoes')) relatos.push(g('regurgitacoes_detalhe') ? `${g('regurgitacoes_detalhe')} de regurgitações` : 'relato de regurgitações');
       return 'com sinais de intolerância' + (relatos.length? ', '+relatos.join(' e ') : '');
     }
     if(aceitChips.includes('boa')) return 'com boa aceitação';
     if(aceitChips.includes('parcial')) return 'com aceitação parcial';
     return '';
   }
+  const aceitTxt = textoAceitacao();
   if(dietaChips.includes('zero')){
-    frases.push('Em dieta zero até segunda ordem.');
+    frases.push('Em dieta zero até segunda ordem' + (aceitTxt? `, ${aceitTxt}`:'') + '.');
   } else if(dietaChips.includes('npt')){
-    frases.push('Em uso de NPT para otimização do aporte nutricional.');
+    frases.push('Em uso de NPT para otimização do aporte nutricional' + (aceitTxt? `, ${aceitTxt}`:'') + '.');
   } else if(dietaChips.includes('oral') || dietaChips.includes('enteral')){
     const tipo = dietaChips.includes('oral') ? 'oral' : 'enteral';
     const submodo = tipo==='oral'
@@ -1631,40 +1702,11 @@ function gerarEvolucaoTemplate(p){
       : chipsTexto('dietaEnteral', {gavagem:'gavagem',bomba:'bomba de infusão'});
     let fDieta = `Dieta ${tipo}`;
     if(submodo.length) fDieta += ` por ${submodo.join(', ')}`;
-    const aceitTxt = textoAceitacao();
     if(aceitTxt) fDieta += `, ${aceitTxt}`;
     frases.push(fDieta + '.');
   }
 
-  // --- Curva térmica ---
-  const febreChips = p.chips.febre||[];
-  if(febreChips.includes('febre')){
-    const tmax = g('febre_tmax'); const epi = g('febre_episodios');
-    let fFebre = 'Apresentou episódio febril nas últimas 24h';
-    const det = [];
-    if(tmax) det.push(`Tmax ${tmax}°C`);
-    if(epi) det.push(`${epi} episódio${epi==='1'?'':'s'}`);
-    if(det.length) fFebre += ` (${det.join(', ')})`;
-    frases.push(fFebre + '.');
-  } else if(febreChips.includes('afebril')){
-    frases.push('Encontra-se afebril.');
-  }
-
-  // --- Função renal + diurese ---
-  if(g('ren_cr') || g('ren_ureia') || g('ren_diurese')){
-    const ajusteRenal = (p.chips.ajusteRenal||[]).includes('sim');
-    let fRenal = ajusteRenal ? 'Apresenta disfunção renal aguda' : 'Função renal preservada';
-    const valores = [];
-    if(g('ren_cr')) valores.push(`Cr ${g('ren_cr')} mg/dL`);
-    if(g('ren_ureia')) valores.push(`Ur ${g('ren_ureia')} mg/dL`);
-    if(valores.length) fRenal += ` (${valores.join(', ')})`;
-    if(g('ren_diurese')){
-      fRenal += `${ajusteRenal? ', porém':' e'} com diurese preservada (${g('ren_diurese')} mL/kg/h)`;
-    }
-    frases.push(fRenal + '.');
-  }
-
-  // --- Antimicrobianos atuais ---
+  // --- Antimicrobianos atuais (narrativa) ---
   if(p.atms && p.atms.length){
     const itens = p.atms.map(a=>{
       let s = a.med||'antimicrobiano não especificado';
@@ -1678,49 +1720,125 @@ function gerarEvolucaoTemplate(p){
     frases.push(`Em uso do esquema antimicrobiano com ${itens.join(', ')}.`);
   }
 
-  // --- Profilaxias ---
-  const clausesProfilaxia = [];
-  if((p.chips.tvp||[]).length && !( (p.chips.tvp||[]).includes('na') && (p.chips.tvp||[]).length===1 )){
-    const det = g('tvp_detalhe');
-    clausesProfilaxia.push(`TEV${det? ' ('+det+')':''}`);
-  }
-  if((p.chips.ulceraEstresse||[]).includes('sim')){
-    const det = g('ulceraEstresse_detalhe');
-    clausesProfilaxia.push(`LAMG${det? ' ('+det+')':''}`);
-  }
-  if((p.chips.ulceraCornea||[]).includes('sim')){
-    const det = g('ulceraCornea_detalhe');
-    clausesProfilaxia.push(`profilaxia para úlcera de córnea${det? ' com '+det:''}`);
-  }
-  if(clausesProfilaxia.length){
-    frases.push(`Em uso de profilaxia para ${juntarComE(clausesProfilaxia)}.`);
+  // --- Função renal (após antimicrobianos, com status selecionável) ---
+  if(g('ren_cr') || g('ren_ureia') || g('ren_diurese')){
+    const statusRenalChip = (p.chips.statusRenal||[])[0];
+    const statusMapa = {preservada:'Função renal preservada', piora:'Função renal em piora', melhora:'Função renal em melhora'};
+    let fRenal = statusMapa[statusRenalChip] || 'Função renal preservada';
+    const ajusteRenal = (p.chips.ajusteRenal||[]).includes('sim');
+    const valores = [];
+    if(g('ren_cr')) valores.push(`Cr ${g('ren_cr')} mg/dL`);
+    if(g('ren_ureia')) valores.push(`Ur ${g('ren_ureia')} mg/dL`);
+    if(valores.length) fRenal += ` (${valores.join(', ')})`;
+    if(ajusteRenal) fRenal += ', com necessidade de ajuste posológico dos medicamentos';
+    if(g('ren_diurese')) fRenal += `${ajusteRenal? ' e':','} diurese de ${g('ren_diurese')} mL/kg/h`;
+    frases.push(fRenal + '.');
   }
 
-  // --- Exames laboratoriais ---
-  if(g('exames_lab')) frases.push(`Exames laboratoriais: ${g('exames_lab')}.`);
-  if(g('exames_img')) frases.push(`Exames de imagem: ${g('exames_img')}.`);
+  // --- Curva térmica (após função renal) ---
+  const febreChips = p.chips.febre||[];
+  if(febreChips.includes('febre')){
+    const tmax = g('febre_tmax'); const epi = g('febre_episodios');
+    let fFebre = 'Apresentou episódio febril nas últimas 24h';
+    const det = [];
+    if(tmax) det.push(`Tmax ${tmax}°C`);
+    if(epi) det.push(`${epi} episódio${epi==='1'?'':'s'}`);
+    if(det.length) fFebre += ` (${det.join(', ')})`;
+    frases.push(fFebre + '.');
+  } else if(febreChips.includes('afebril')){
+    frases.push('Encontra-se afebril.');
+  }
 
-  // --- Funções eliminatórias (sempre por último, conforme preferência) ---
-  const funcElimMapa = {nausea:'náusea',vomito:'vômito',eliminacoesAusentes:'eliminações intestinais ausentes',eliminacoesPreservadas:'eliminações intestinais preservadas'};
-  const funcElim = chipsTexto('funcoesEliminatorias', funcElimMapa);
-  if(funcElim.length) frases.push(`Apresenta ${funcElim.join(', ')}.`);
+  // --- Náusea/vômito (frases específicas) + funções eliminatórias (sempre por último) ---
+  const funcElimChips = p.chips.funcoesEliminatorias||[];
+  if(funcElimChips.includes('nausea')) frases.push('Paciente refere náusea.');
+  if(funcElimChips.includes('vomito')) frases.push('Relato de episódio de vômito.');
+  const elimGenerico = [];
+  if(funcElimChips.includes('eliminacoesAusentes')) elimGenerico.push('eliminações intestinais ausentes');
+  if(funcElimChips.includes('eliminacoesPreservadas')) elimGenerico.push('eliminações intestinais preservadas');
+  if(elimGenerico.length) frases.push(`Apresenta ${elimGenerico.join(', ')}.`);
 
   const secoes = [];
   secoes.push('1. Evolução Clínica\n' + frases.join(' '));
 
-  // ---------- 2. INFECÇÃO E MICROBIOLOGIA ----------
-  const infec = [];
-  if(p.atms && p.atms.length){
-    infec.push('• Antimicrobianos em uso:\n' + p.atms.map(a=>`  - ${a.med}${a.dose? ' '+a.dose:''}${a.via? ' '+a.via:''}${a.intervalo? ' '+a.intervalo:''}${a.dta? ' (DTA '+a.dta+')':''}`).join('\n'));
+  // ---------- 2. MEDICAMENTOS EM USO (FASTHUG) ----------
+  function listaFasthug(lista, campoOutro){
+    if(!lista || !lista.length) return null;
+    return lista.map(d=>{
+      const nome = d.med===(campoOutro||'Outro') ? (d.custom||'medicamento não especificado') : d.med;
+      const doseTxt = d.dose || (d.vazao? d.vazao+' mL/h' : '');
+      return `${nome}${doseTxt? ' '+doseTxt:''}`;
+    }).join(' + ');
   }
-  if(p.uso_previo_atb) infec.push('• Uso prévio de antimicrobianos:\n  - ' + p.uso_previo_atb);
-  if(g('historico_culturas')) infec.push('• História prévia de culturas:\n  - ' + g('historico_culturas'));
-  if(p.culturas && p.culturas.length){
-    infec.push('• Culturas:\n' + p.culturas.map(c=>`  - ${c.material||'material não especificado'}${c.dataColeta? ' ('+c.dataColeta+')':''}: ${c.resultadoFinal||'resultado pendente'}${c.identificacaoAgente? ' — '+c.identificacaoAgente:''}${c.fenotipo? ', fenótipo '+c.fenotipo:''}${c.padrao? ', padrão '+c.padrao:''}`).join('\n'));
+  const fDvaFasthug = listaFasthug(p.dva) || 'não';
+  let fAnalgoFasthug = 'não';
+  if((p.chips.sedoanalgesia||[]).includes('sim')){
+    const partes = [];
+    const contFasthug = listaFasthug(p.sedacao);
+    if(contFasthug) partes.push(contFasthug);
+    if(p.sedacaoInterm && p.sedacaoInterm.length){
+      partes.push(p.sedacaoInterm.map(d=>{
+        const nome = d.med==='Outros' ? (d.custom||'medicamento não especificado') : d.med;
+        return `${nome}${d.dose? ' '+d.dose:''}${d.frequencia? ' '+d.frequencia:''}`;
+      }).join(' + '));
+    }
+    fAnalgoFasthug = partes.length ? partes.join(' + ') : 'sim';
   }
-  secoes.push('2. Infectologia e Microbiologia\n' + (infec.length? infec.join('\n') : '• Sem dados registrados.'));
+  const tvpAtiva = (p.chips.tvp||[]).length && !((p.chips.tvp||[]).includes('na') && (p.chips.tvp||[]).length===1);
+  const fTevFasthug = tvpAtiva ? (g('tvp_detalhe')||'sim') : 'não';
+  const fLamgFasthug = (p.chips.ulceraEstresse||[]).includes('sim') ? (g('ulceraEstresse_detalhe')||'sim') : 'não';
+  const fCorneaFasthug = (p.chips.ulceraCornea||[]).includes('sim') ? (g('ulceraCornea_detalhe')||'sim') : 'não';
+  let fCorticoideFasthug = 'não';
+  {
+    const corticoideAtivo = (p.chips.corticoides||[]).includes('sim');
+    const dartAtivo = (p.chips.dart||[]).includes('sim');
+    if(corticoideAtivo || dartAtivo){
+      const partes = [];
+      if(corticoideAtivo) partes.push(g('corticoide_detalhe')||'sim');
+      if(dartAtivo) partes.push('Esquema DART'+(g('dart_detalhe')? ': '+g('dart_detalhe'):''));
+      fCorticoideFasthug = partes.join('; ');
+    }
+  }
+  const fOutrosFasthug = g('lista_medicamentos') || 'nenhum outro medicamento registrado';
 
-  // ---------- 3. INTERAÇÕES E INCOMPATIBILIDADES ----------
+  const secaoMedicamentos = `2. Medicamentos em Uso\n#DVA: ${fDvaFasthug}.\n#Analgosedação: ${fAnalgoFasthug}.\n#Profilaxia TEV: ${fTevFasthug}.\n#Profilaxia LAMG: ${fLamgFasthug}.\n#Profilaxia Úlcera de Córnea: ${fCorneaFasthug}.\n#Corticoides: ${fCorticoideFasthug}.\n#Outros: ${fOutrosFasthug}.`;
+  secoes.push(secaoMedicamentos);
+
+  // ---------- 3. GERENCIAMENTO DE ANTIMICROBIANOS ----------
+  const usoAtualTxt = (p.atms && p.atms.length)
+    ? p.atms.map(a=>{
+        let s = `  - ${a.med||'antimicrobiano não especificado'}`;
+        if(a.dose) s += ' '+a.dose;
+        if(a.via) s += ' '+a.via;
+        if(a.intervalo) s += ' '+a.intervalo;
+        const dta = calcularDTA(a.inicio);
+        if(dta) s += ` (DTA ${dta})`;
+        return s;
+      }).join('\n')
+    : '  Nenhum antimicrobiano em uso atual.';
+  const usoPrevioTxt = g('uso_previo_atb') ? '  '+g('uso_previo_atb') : '  Não relatado.';
+  const historicoCulturasTxt = g('historico_culturas') ? '  '+g('historico_culturas') : '  Não relatado.';
+  const culturasAndamentoTxt = (p.culturas && p.culturas.length)
+    ? p.culturas.map(c=>{
+        let linha = `  - ${c.material||'material não especificado'}`;
+        if(c.dataColeta) linha += ` (${formatarDataBR(c.dataColeta)})`;
+        linha += ': ' + (c.identificacaoAgente || 'resultado pendente');
+        if(c.fenotipo) linha += ` ${c.fenotipo}`;
+        if(c.padrao) linha += ` - padrão ${c.padrao}`;
+        if(c.tsa) linha += ` - sensível a ${c.tsa}`;
+        return linha;
+      }).join('\n')
+    : '  Nenhuma cultura em andamento.';
+
+  secoes.push(`3. Gerenciamento de Antimicrobianos\n• Uso Atual:\n${usoAtualTxt}\n\n• Uso Prévio:\n${usoPrevioTxt}\n\n• História Prévia de Culturas:\n${historicoCulturasTxt}\n\n• Culturas em Andamento:\n${culturasAndamentoTxt}`);
+
+  // ---------- 4. EXAMES LABORATORIAIS ----------
+  const examesLinhas = [];
+  if(g('exames_lab')) examesLinhas.push('  '+g('exames_lab'));
+  if(g('exames_img')) examesLinhas.push('  Imagem: '+g('exames_img'));
+  secoes.push('4. Exames Laboratoriais\n' + (examesLinhas.length? examesLinhas.join('\n') : '  Não realizados/registrados.'));
+
+  // ---------- 5. INTERAÇÕES E INCOMPATIBILIDADES ----------
   const inter = [];
   if(p.interacoes && p.interacoes.length){
     inter.push('• Interações Medicamentosas clinicamente relevantes:\n' + p.interacoes.filter(i=>i.relevancia==='SIM').map(i=>`  - ${i.impacto||i.par||''}${i.manejo? ' '+i.manejo:''}`).join('\n'));
@@ -1728,17 +1846,13 @@ function gerarEvolucaoTemplate(p){
   if(p.incompat && p.incompat.length){
     inter.push('• Incompatibilidades:\n' + p.incompat.filter(i=>i.relevancia==='SIM').map(i=>`  - ${i.par||''}${i.conduta? ' — '+i.conduta:''}`).join('\n'));
   }
-  secoes.push('3. Interações Medicamentosas e Incompatibilidades\n' + (inter.length? inter.join('\n') : '• Sem interações ou incompatibilidades clinicamente relevantes identificadas.'));
+  secoes.push('5. Interações Medicamentosas e Incompatibilidades\n' + (inter.length? inter.join('\n') : '• Sem interações ou incompatibilidades clinicamente relevantes identificadas.'));
 
-  // ---------- 4. AVALIAÇÃO E RECOMENDAÇÃO FARMACÊUTICA ----------
-  if(g('avaliacao_farmaceutica') || g('recomendacao_farmaceutica')){
-    let secaoAR = '4. Avaliação e Recomendação Farmacêutica\n';
-    secaoAR += 'A — Avaliação:\n' + (g('avaliacao_farmaceutica') || '  Não descrita.');
-    secaoAR += '\n\nR — Recomendação:\n' + (g('recomendacao_farmaceutica') || '  —');
-    secoes.push(secaoAR);
-  }
+  // ---------- 6. CONDUTA FARMACÊUTICA E PLANO TERAPÊUTICO ----------
+  const condutaBlocos = [];
+  if(g('avaliacao_farmaceutica')) condutaBlocos.push('A — Avaliação:\n' + g('avaliacao_farmaceutica'));
+  if(g('recomendacao_farmaceutica')) condutaBlocos.push('R — Recomendação:\n' + g('recomendacao_farmaceutica'));
 
-  // ---------- 5. CONDUTA FARMACÊUTICA E PLANO TERAPÊUTICO ----------
   const conduta = [];
   const intervHoje = intervencoesDeHoje(p);
   if(intervHoje.length){
@@ -1751,18 +1865,19 @@ function gerarEvolucaoTemplate(p){
   const condutaExtraTexto = g('conduta_extra');
   const condutaExtraLinhas = condutaExtraTexto ? condutaExtraTexto.split('\n').filter(l=>l.trim()).map(l=>`  - ${l.trim()}`) : [];
   const condutaLinhas = [...conduta, ...frasesCondutaSelecionadas, ...condutaExtraLinhas];
+  if(condutaLinhas.length) condutaBlocos.push(condutaLinhas.join('\n'));
 
   const frasesPadraoSelecionadas = (p.planoFrasesPadrao||[]).map(idx=>`  - ${FRASES_PADRAO_PLANO[idx]}`);
   const planoTexto = g('plano_terapeutico');
   const planoLinhasCustom = planoTexto ? planoTexto.split('\n').filter(l=>l.trim()).map(l=>`  - ${l.trim()}`) : [];
   const planoLinhas = [...frasesPadraoSelecionadas, ...planoLinhasCustom];
 
-  let secaoConduta = '5. Conduta Farmacêutica e Plano Terapêutico\n';
-  secaoConduta += '• Conduta Farmacêutica:\n' + (condutaLinhas.length? condutaLinhas.join('\n') : '  Nenhuma conduta registrada hoje.');
+  let secaoConduta = '6. Conduta Farmacêutica e Plano Terapêutico\n';
+  secaoConduta += '• Conduta Farmacêutica:\n' + (condutaBlocos.length? condutaBlocos.join('\n\n') : '  Nenhuma conduta registrada hoje.');
   secaoConduta += '\n\n• Plano Terapêutico Definido:\n' + (planoLinhas.length? planoLinhas.join('\n') : '  Não definido.');
   secoes.push(secaoConduta);
 
-  return secoes.join('\n\n');
+  return gerarCabecalhoEvolucao(p) + '\n\n' + secoes.join('\n\n');
 }
 
 const ASSINATURA_STORAGE = 'farmacia_clinica_assinatura';
@@ -1806,8 +1921,11 @@ function gerarReconciliacaoTemplate(p){
   partes.push('# ANAMNESE FARMACÊUTICA\n' + (g('hda') || 'Não descrita.'));
 
   // ---------- Reconciliação Medicamentosa ----------
+  const usoDomSelecionado = (p.chips.usoDomiciliar||[])[0];
   let reconcTxt;
-  if(p.reconc && p.reconc.length){
+  if(usoDomSelecionado === 'nao_usava'){
+    reconcTxt = 'Paciente não fazia uso de medicamentos.';
+  } else if(p.reconc && p.reconc.length){
     const linhas = p.reconc.map(r=>{
       let linha = `- ${r.medicamento||'medicamento não especificado'}`;
       if(r.concentracao) linha += ` ${r.concentracao}`;
@@ -1819,7 +1937,7 @@ function gerarReconciliacaoTemplate(p){
     });
     reconcTxt = linhas.join('\n');
   } else {
-    reconcTxt = 'Nenhum medicamento de uso domiciliar relatado.';
+    reconcTxt = usoDomSelecionado==='usava' ? 'Paciente fazia uso de medicamentos, porém nenhum item foi detalhado ainda.' : 'Reconciliação medicamentosa ainda não realizada.';
   }
   // Termo de consentimento (uso de medicamento próprio) — logo abaixo da reconciliação
   const termoSelecionado = (p.chips.termoConsentimento||[])[0];
@@ -1828,7 +1946,7 @@ function gerarReconciliacaoTemplate(p){
     naoAplicava: 'Paciente não fará uso de medicamento próprio durante a internação.',
     recusou: 'Paciente fará uso de medicamento próprio durante a internação, porém se recusou a assinar termo de consentimento.'
   };
-  if(termoSelecionado) reconcTxt += '\n\n' + termoMapa[termoSelecionado];
+  if(termoSelecionado && usoDomSelecionado==='usava') reconcTxt += '\n\n' + termoMapa[termoSelecionado];
   partes.push('# RECONCILIAÇÃO MEDICAMENTOSA\n' + reconcTxt);
 
   // ---------- Alergias / RAM ----------
@@ -2331,6 +2449,106 @@ function sairApp(){
     }
   } catch(e){}
 })();
+
+async function exportarResumoVisita(){
+  if(typeof docx === 'undefined'){ showToast('Não foi possível carregar a biblioteca de exportação (sem conexão com a internet).'); return; }
+  const ativos = pacientes.filter(p=>p.status==='Ativo');
+  if(!ativos.length){ showToast('Nenhum paciente ativo para incluir no resumo.'); return; }
+
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+    WidthType, ShadingType, AlignmentType, BorderStyle, PageOrientation, VerticalAlign, Header, Footer } = docx;
+
+  const AZUL='2563EB', AZUL_ESCURO='1D4ED8', CINZA_CLARO='F4F6FA', CINZA_TEXTO='6B7690', BORDA_COR='D7DEEA';
+  const borda = { style: BorderStyle.SINGLE, size: 4, color: BORDA_COR };
+  const bordasCelula = { top: borda, bottom: borda, left: borda, right: borda };
+
+  function celulaCabecalho(texto, largura){
+    return new TableCell({ width:{size:largura,type:WidthType.DXA}, shading:{type:ShadingType.CLEAR,fill:AZUL}, verticalAlign:VerticalAlign.CENTER,
+      margins:{top:90,bottom:90,left:100,right:100}, borders:bordasCelula,
+      children:[new Paragraph({children:[new TextRun({text:texto,bold:true,color:'FFFFFF',size:16})]})] });
+  }
+  function celula(linhas, largura, opts={}){
+    const arr = (Array.isArray(linhas)?linhas:[linhas]).filter(Boolean);
+    const paragraphs = arr.length ? arr.map(l=>{
+      if(typeof l==='string') return new Paragraph({spacing:{after:40}, children:[new TextRun({text:l,size:opts.size||16})]});
+      return new Paragraph({spacing:{after:40}, children:[new TextRun({text:l.text,size:opts.size||16,bold:l.bold,color:l.color})]});
+    }) : [new Paragraph({children:[new TextRun({text:'—',size:opts.size||16,color:CINZA_TEXTO})]})];
+    return new TableCell({ width:{size:largura,type:WidthType.DXA}, verticalAlign:VerticalAlign.TOP,
+      margins:{top:90,bottom:90,left:100,right:100}, shading: opts.fill?{type:ShadingType.CLEAR,fill:opts.fill}:undefined,
+      borders:bordasCelula, children:paragraphs });
+  }
+
+  const larguras = [1500,2000,1900,2600,2200,1900,2300];
+  const larguraTotal = larguras.reduce((a,b)=>a+b,0);
+  const colunas = ['Leito / Setor','Paciente','Diagnóstico','Medicamentos em Uso','Antimicrobiano (DTA)','Renal / Dieta','Pontos para Discussão'];
+
+  const statusRenalMapa = {preservada:'Preservada',piora:'Em Piora',melhora:'Em Melhora'};
+  const dietaMapa = {zero:'Dieta Zero',oral:'Dieta Oral',enteral:'Dieta Enteral',npt:'NPT'};
+  const aceitMapa = {boa:'boa aceitação',parcial:'aceitação parcial',intolerancia:'intolerância',residuo:'resíduo',regurgitacoes:'regurgitações'};
+
+  const linhasPacientes = ativos.map((p, idx)=>{
+    const fill = idx % 2 ? CINZA_CLARO : undefined;
+
+    const medicamentos = [];
+    if(p.dva && p.dva.length) medicamentos.push({text:'DVA: '+p.dva.map(d=>`${d.med==='Outro'?(d.custom||'—'):d.med}${d.dose?' '+d.dose:(d.vazao?' '+d.vazao+' mL/h':'')}`).join(' + '), bold:true});
+    if((p.chips.sedoanalgesia||[]).includes('sim') && p.sedacao && p.sedacao.length) medicamentos.push({text:'Sedação: '+p.sedacao.map(d=>`${d.med==='Outro'?(d.custom||'—'):d.med}${d.dose?' '+d.dose:(d.vazao?' '+d.vazao+' mL/h':'')}`).join(' + '), bold:true});
+    if(p.lista_medicamentos) medicamentos.push(p.lista_medicamentos);
+
+    const atmLinhas = (p.atms && p.atms.length) ? p.atms.map(a=>{
+      const dta = typeof calcularDTA==='function' ? calcularDTA(a.inicio) : '';
+      return `${a.med||'—'}${a.dose?' '+a.dose:''}${a.intervalo?' '+a.intervalo:''}${dta?' (DTA '+dta+')':''}`;
+    }) : ['Nenhum em uso atual'];
+
+    const statusRenalChip = (p.chips.statusRenal||[])[0];
+    const renalLinhas = [];
+    if(p.ren_cr || p.ren_ureia || statusRenalChip){
+      renalLinhas.push({text: statusRenalMapa[statusRenalChip]||'—', bold:true, color: statusRenalChip==='piora'?'B91C1C':(statusRenalChip==='melhora'?'166534':undefined)});
+      if(p.ren_cr || p.ren_ureia) renalLinhas.push(`Cr ${p.ren_cr||'—'} · Ur ${p.ren_ureia||'—'}`);
+    }
+    const dietaChipsAtivos = (p.chips.dieta||[]).map(k=>dietaMapa[k]).filter(Boolean);
+    const aceitChipsAtivos = (p.chips.aceitacao||[]).map(k=>aceitMapa[k]).filter(Boolean);
+    if(dietaChipsAtivos.length) renalLinhas.push(dietaChipsAtivos.join(', ') + (aceitChipsAtivos.length? ' — '+aceitChipsAtivos.join(', ') : ''));
+
+    return new TableRow({ cantSplit:true, children:[
+      celula([`${p.leito||'—'}`, p.setor], larguras[0], {fill}),
+      celula([{text:p.nome,bold:true}, p.idade||'', `Pront. ${p.prontuario||'—'}`], larguras[1], {fill}),
+      celula(p.diagnostico||'', larguras[2], {fill}),
+      celula(medicamentos, larguras[3], {fill}),
+      celula(atmLinhas, larguras[4], {fill}),
+      celula(renalLinhas, larguras[5], {fill}),
+      celula('', larguras[6], {fill})
+    ]});
+  });
+
+  const tabela = new Table({ width:{size:larguraTotal,type:WidthType.DXA}, columnWidths:larguras,
+    rows:[ new TableRow({tableHeader:true, children:colunas.map((c,i)=>celulaCabecalho(c,larguras[i]))}), ...linhasPacientes ] });
+
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const doc = new Document({ sections:[{
+    properties:{ page:{ size:{width:15840,height:12240}, orientation:PageOrientation.LANDSCAPE, margin:{top:720,bottom:720,left:720,right:720} } },
+    headers:{ default: new Header({ children:[
+      new Paragraph({ children:[ new TextRun({text:'FARMÁCIA CLÍNICA — HMAF',bold:true,size:22,color:AZUL_ESCURO}), new TextRun({text:'   |   Resumo para Visita Multiprofissional',size:20,color:CINZA_TEXTO}) ] }),
+      new Paragraph({ spacing:{after:160}, children:[ new TextRun({text:`Data: ${hoje}`,size:18,color:CINZA_TEXTO}), new TextRun({text:'     Farmacêutica: ______________________',size:18,color:CINZA_TEXTO}) ] })
+    ]}) },
+    footers:{ default: new Footer({ children:[ new Paragraph({alignment:AlignmentType.CENTER, children:[ new TextRun({text:'Gerado automaticamente a partir da Ficha de Acompanhamento Farmacoterapêutico',size:14,color:CINZA_TEXTO,italics:true}) ]}) ] }) },
+    children:[
+      tabela,
+      new Paragraph({spacing:{before:200}, children:[]}),
+      new Paragraph({children:[new TextRun({text:'Anotações da visita:',bold:true,size:18,color:AZUL_ESCURO})]}),
+      new Paragraph({spacing:{before:300}, border:{bottom:{style:BorderStyle.SINGLE,size:4,color:BORDA_COR}}, children:[]}),
+      new Paragraph({spacing:{before:300}, border:{bottom:{style:BorderStyle.SINGLE,size:4,color:BORDA_COR}}, children:[]}),
+      new Paragraph({spacing:{before:300}, border:{bottom:{style:BorderStyle.SINGLE,size:4,color:BORDA_COR}}, children:[]})
+    ]
+  }]});
+
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `resumo_visita_${new Date().toISOString().slice(0,10)}.docx`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Documento gerado com sucesso!');
+}
 
 function exportarBackup(){
   salvarEstado();
