@@ -7,32 +7,32 @@ Aplicativo web para acompanhamento farmacoterapêutico em UTI Neonatal, UTI Pedi
 ```
 ├── index.html                → O APLICATIVO (front-end)
 ├── netlify.toml               → Configuração do Netlify (funções + rotas /api/*)
-├── package.json                → Dependência da função (@netlify/neon)
+├── package.json                → Dependência da função (@netlify/database)
 ├── netlify/functions/
 │   ├── setup-db.js             → Cria a tabela "pacientes" (rodar 1x)
-│   └── pacientes.js            → API: listar / criar / atualizar pacientes
+│   └── pacientes.js            → API: listar / criar / atualizar / excluir pacientes
 ├── planilhas-comparativas/     → Versões em planilha, feitas como comparação ao app
 └── prototipo-python/           → Protótipo inicial em Python/Streamlit
 ```
 
 ## Configuração do banco de dados (equipe compartilhada)
 
-Passo a passo, direto no painel do Netlify:
-
-1. **Ative o banco**: no seu site → aba **Database** → siga o fluxo de criação (é o Postgres gerenciado pelo Netlify/Neon). Isso já configura sozinho a variável de conexão que as funções usam.
-2. **Configure a senha da equipe**: em **Project configuration → Environment variables**, crie uma variável `EQUIPE_SENHA` com o valor da senha que todo mundo vai usar para entrar (combine com a equipe qual vai ser).
-3. **Crie a tabela**: depois do deploy, acesse uma vez no navegador:
-   `https://SEU-SITE.netlify.app/.netlify/functions/setup-db`
-   Deve aparecer uma mensagem confirmando que a tabela foi criada. Só precisa fazer isso uma vez.
-4. **Pronto**: ao abrir o app, vai aparecer uma tela pedindo nome e a senha da equipe. Todo mundo usa a mesma senha; o nome digitado é só para identificar quem criou/alterou cada registro (não é uma conta de verdade, é só um campo de identificação).
+1. **Ative o banco**: no seu site → aba **Database** → siga o fluxo de criação (Postgres gerenciado, powered by Neon).
+2. **Pegue a connection string**: na tela do banco, clique na branch **"production"** → copie a string **"Read and write"**.
+3. **Configure as variáveis de ambiente**: em **Project configuration → Environment variables**, crie:
+   - `PACIENTES_DB_URL` → a connection string que você copiou
+   - `EQUIPE_SENHA` → a senha que toda a equipe vai usar para entrar no app
+4. **Force um novo deploy** (qualquer edição no repositório, ex: no README, dispara isso automaticamente).
+5. **Crie a tabela**: acesse uma vez no navegador `https://SEU-SITE.netlify.app/.netlify/functions/setup-db`.
+6. **Pronto**: ao abrir o app, aparece uma tela pedindo nome + a senha da equipe. Todo mundo usa a mesma senha; o nome é só pra identificar quem criou/alterou cada registro.
 
 ### Migrando dados que já existiam no seu navegador
 
-Se você já usava o app antes (dados salvos localmente), use o botão **"Restaurar Backup"** depois de logada — ele agora envia esses pacientes para o banco compartilhado automaticamente, em vez de só recarregar localmente.
+Use o botão **"Restaurar Backup"** depois de logada — ele envia esses pacientes para o banco compartilhado automaticamente.
 
 ## Sobre o acesso aos dados
 
-Como a partir de agora o app guarda dados clínicos reais num banco compartilhado (não mais só no seu navegador), veja com o setor de TI/compliance do hospital se essa forma de hospedagem (conta pessoal no Netlify) está de acordo com a política de dados da instituição antes de colocar a equipe toda usando.
+Como o app guarda dados clínicos reais num banco compartilhado (não mais só no seu navegador), veja com o setor de TI/compliance do hospital se essa forma de hospedagem está de acordo com a política de dados da instituição.
 
 ## Sobre as planilhas comparativas e o protótipo Python
 
