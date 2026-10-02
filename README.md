@@ -1,8 +1,8 @@
 # Ficha de Acompanhamento Farmacêutico — Pediatria & Neonatologia
 
-Aplicativo web para acompanhamento farmacoterapêutico em UTI Neonatal, UTI Pediátrica e UCSIN, com geração automática de evolução clínica e reconciliação medicamentosa por template, registro de intervenções farmacêuticas, e indicadores de farmácia clínica.
+Aplicativo web para acompanhamento farmacoterapêutico em UTI Neonatal, UTI Pediátrica e UCSIN.
 
-## Estrutura do repositório
+## Estrutura
 
 ```
 ├── index.html                → O APLICATIVO (front-end)
@@ -11,29 +11,24 @@ Aplicativo web para acompanhamento farmacoterapêutico em UTI Neonatal, UTI Pedi
 ├── netlify/functions/
 │   ├── setup-db.js             → Cria a tabela "pacientes" (rodar 1x)
 │   └── pacientes.js            → API: listar / criar / atualizar / excluir pacientes
-├── planilhas-comparativas/     → Versões em planilha, feitas como comparação ao app
-└── prototipo-python/           → Protótipo inicial em Python/Streamlit
+├── planilhas-comparativas/
+└── prototipo-python/
 ```
 
-## Configuração do banco de dados (equipe compartilhada)
+## Atualização importante: salvamento ao sair da página
 
-1. **Ative o banco**: no seu site → aba **Database** → siga o fluxo de criação (Postgres gerenciado, powered by Neon).
-2. **Pegue a connection string**: na tela do banco, clique na branch **"production"** → copie a string **"Read and write"**.
-3. **Configure as variáveis de ambiente**: em **Project configuration → Environment variables**, crie:
-   - `PACIENTES_DB_URL` → a connection string que você copiou
-   - `EQUIPE_SENHA` → a senha que toda a equipe vai usar para entrar no app
-4. **Force um novo deploy** (qualquer edição no repositório, ex: no README, dispara isso automaticamente).
-5. **Crie a tabela**: acesse uma vez no navegador `https://SEU-SITE.netlify.app/.netlify/functions/setup-db`.
-6. **Pronto**: ao abrir o app, aparece uma tela pedindo nome + a senha da equipe. Todo mundo usa a mesma senha; o nome é só pra identificar quem criou/alterou cada registro.
+O app salva automaticamente a cada 8 segundos enquanto está aberto. Para o momento de SAIR/fechar
+a aba, agora usa `navigator.sendBeacon()` em vez de `fetch()` — isso evita que o navegador corte o
+salvamento no meio do caminho quando a página está fechando (um problema real que causava perda de
+dados antes). Essa mudança exige o `pacientes.js` atualizado — se você já tinha subido uma versão
+anterior, suba esse arquivo de novo.
 
-### Migrando dados que já existiam no seu navegador
+## Configuração do banco de dados
 
-Use o botão **"Restaurar Backup"** depois de logada — ele envia esses pacientes para o banco compartilhado automaticamente.
-
-## Sobre o acesso aos dados
-
-Como o app guarda dados clínicos reais num banco compartilhado (não mais só no seu navegador), veja com o setor de TI/compliance do hospital se essa forma de hospedagem está de acordo com a política de dados da instituição.
-
-## Sobre as planilhas comparativas e o protótipo Python
-
-Ficaram no repositório como registro do processo de comparação de abordagens — o app (`index.html` + backend) é a versão recomendada para uso contínuo.
+1. Ative o banco na aba **Database** do seu projeto Netlify.
+2. Pegue a connection string **"Read and write"** da branch "production".
+3. Em **Project configuration → Environment variables**, crie:
+   - `PACIENTES_DB_URL` → a connection string
+   - `EQUIPE_SENHA` → a senha que a equipe toda vai usar
+4. Force um novo deploy (qualquer edição no repositório dispara isso).
+5. Acesse uma vez `https://SEU-SITE.netlify.app/.netlify/functions/setup-db` pra criar a tabela.

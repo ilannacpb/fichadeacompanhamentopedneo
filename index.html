@@ -238,7 +238,14 @@
       <h2>Pacientes</h2>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span id="autosaveInd" style="font-size:11px;color:var(--text-dim)">Dados salvos neste navegador</span>
+        <select id="filtroSetor" onchange="renderLista()" style="padding:8px 12px;border-radius:999px;border:1px solid var(--border);font-size:12.5px;font-weight:700;color:var(--text-soft)">
+          <option value="">Todos os Setores</option>
+          <option value="UTI ped">UTI Pediátrica</option>
+          <option value="UTI neo">UTI Neonatal</option>
+          <option value="UCSIN">UCSIN</option>
+        </select>
         <button class="btn btn-outline btn-sm" onclick="imprimirResumoVisita()">🖨️ Resumo p/ Visita (Imprimir/PDF)</button>
+        <button class="btn btn-outline btn-sm" onclick="imprimirCulturasAndamento()">🧫 Culturas em Andamento (PDF)</button>
         <button class="btn btn-outline btn-sm" onclick="exportarBackup()">Baixar Backup</button>
         <label class="btn btn-outline btn-sm" style="cursor:pointer">Restaurar Backup<input type="file" accept="application/json" style="display:none" onchange="importarBackup(this)"></label>
         <button class="btn btn-teal" onclick="abrirModalNovo()">+ Novo Paciente</button>
@@ -292,15 +299,15 @@
         <div class="field"><label>Prontuário</label><input type="text" id="fh_prontuario" disabled></div>
       </div>
       <div class="grid g4" style="margin-top:12px">
-        <div class="field"><label>Data de Nascimento</label><input type="date" id="fh_dn" oninput="p_updHeader('dn',this.value)"></div>
-        <div class="field"><label>Idade</label><input type="text" id="fh_idade" placeholder="Ex: 3 anos / 2m4d" oninput="p_updHeader('idade',this.value)"></div>
+        <div class="field"><label>Data de Nascimento</label><input type="date" id="fh_dn" oninput="p_updHeader('dn',this.value); atualizarIdadeIGC();"></div>
+        <div class="field"><label>Idade <span style="font-weight:400;font-size:10px;color:var(--text-soft)">(auto, se DN preenchida)</span></label><input type="text" id="fh_idade" placeholder="Ex: 3 anos / 2m4d" oninput="p_updHeader('idade',this.value)"></div>
         <div class="field"><label>Peso Atual (kg)</label><input type="text" id="fh_peso" oninput="p_updHeader('peso',this.value)"></div>
         <div class="field"><label>Estatura (cm)</label><input type="text" id="fh_estatura" oninput="p_updHeader('estatura',this.value)"></div>
       </div>
       <div class="grid g4 neo-only" id="neoIdRow" style="margin-top:12px">
         <div class="field"><label>Peso ao Nascer (kg)</label><input type="text" id="fh_pesoNasc" oninput="p_updHeader('pesoNasc',this.value)"></div>
-        <div class="field"><label>IG (Idade Gestacional)</label><input type="text" id="fh_ig" placeholder="Ex: 33s4d" oninput="p_updHeader('ig',this.value)"></div>
-        <div class="field"><label>IGC</label><input type="text" id="fh_igc" placeholder="Ex: 33s6d" oninput="p_updHeader('igc',this.value)"></div>
+        <div class="field"><label>IG (Idade Gestacional)</label><input type="text" id="fh_ig" placeholder="Ex: 33s4d ou 33sem4d" oninput="p_updHeader('ig',this.value); atualizarIdadeIGC();"></div>
+        <div class="field"><label>IGC <span style="font-weight:400;font-size:10px;color:var(--text-soft)">(auto, se IG e DN preenchidas)</span></label><input type="text" id="fh_igc" placeholder="Ex: 33s6d" oninput="p_updHeader('igc',this.value)"></div>
         <div class="field"><label>Apgar</label><input type="text" id="fh_apgar" placeholder="Ex: 8/9" oninput="p_updHeader('apgar',this.value)"></div>
       </div>
       <div class="grid g2" style="margin-top:12px">
@@ -922,8 +929,11 @@ function renderLista(){
   const lista = document.getElementById('plist');
   let pacientesFiltrados = pacientes.filter(p => abaPacientesAtual==='ativos' ? p.status==='Ativo' : p.status==='Alta');
 
+  const setorFiltro = document.getElementById('filtroSetor') ? document.getElementById('filtroSetor').value : '';
+  if(setorFiltro) pacientesFiltrados = pacientesFiltrados.filter(p => p.setor === setorFiltro);
+
   if(abaPacientesAtual==='alta'){
-    const pacientesAlta = pacientes.filter(p=>p.status==='Alta');
+    const pacientesAlta = pacientesFiltrados;
     const todosMeses = new Set();
     pacientesAlta.forEach(p=> mesesAcompanhados(p).forEach(m=>todosMeses.add(m)));
     const mesesOrdenados = [...todosMeses].sort();
@@ -1009,6 +1019,66 @@ function mudarSetor(){
   document.getElementById('view-ficha').classList.toggle('neo-mode', isNeo(p.setor));
 }
 
+function calcularIdadePorDN(dnISO){
+  if(!dnISO) return '';
+  const nasc = new Date(dnISO+'T00:00:00');
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const diasTotais = Math.floor((hoje - nasc) / 86400000);
+  if(diasTotais < 0 || isNaN(diasTotais)) return '';
+  if(diasTotais < 30) return `${diasTotais} dia${diasTotais===1?'':'s'} de vida`;
+
+  let anos = hoje.getFullYear() - nasc.getFullYear();
+  let meses = hoje.getMonth() - nasc.getMonth();
+  let dias = hoje.getDate() - nasc.getDate();
+  if(dias < 0){
+    meses -= 1;
+    dias += new Date(hoje.getFullYear(), hoje.getMonth(), 0).getDate();
+  }
+  if(meses < 0){ anos -= 1; meses += 12; }
+
+  if(anos >= 1){
+    return `${anos} ano${anos===1?'':'s'}${meses? ' e '+meses+' mes'+(meses===1?'':'es'):''}`;
+  }
+  return `${meses} mes${meses===1?'':'es'}${dias? ' e '+dias+' dia'+(dias===1?'':'s'):''}`;
+}
+
+function parseIGparaDias(texto){
+  if(!texto) return null;
+  const m = texto.match(/(\d+)\s*(?:sem|s)\D*(\d+)?\s*(?:d|dias?)?/i);
+  if(!m) return null;
+  const semanas = parseInt(m[1],10);
+  const dias = m[2] ? parseInt(m[2],10) : 0;
+  return semanas*7 + dias;
+}
+function formatarDiasComoIG(totalDias){
+  const semanas = Math.floor(totalDias/7);
+  const dias = totalDias % 7;
+  return `${semanas}s${dias}d`;
+}
+function calcularIGCPorIGeDN(igTexto, dnISO){
+  const igDias = parseIGparaDias(igTexto);
+  if(igDias===null || !dnISO) return '';
+  const nasc = new Date(dnISO+'T00:00:00');
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const diasVida = Math.floor((hoje - nasc) / 86400000);
+  if(diasVida < 0 || isNaN(diasVida)) return '';
+  return formatarDiasComoIG(igDias + diasVida);
+}
+function atualizarIdadeIGC(){
+  const p = pacientes.find(x=>x.id===fichaAtivaId);
+  if(!p) return;
+  const idadeCalc = calcularIdadePorDN(p.dn);
+  if(idadeCalc){
+    document.getElementById('fh_idade').value = idadeCalc;
+    p.idade = idadeCalc;
+  }
+  const igcCalc = calcularIGCPorIGeDN(p.ig, p.dn);
+  if(igcCalc){
+    document.getElementById('fh_igc').value = igcCalc;
+    p.igc = igcCalc;
+  }
+}
+
 function p_updHeader(campo, valor){
   const p = pacientes.find(x=>x.id===fichaAtivaId);
   if(!p) return;
@@ -1063,6 +1133,7 @@ function abrirFicha(id){
   document.getElementById('fh_pesoNasc').value = p.pesoNasc||'';
   document.getElementById('fh_ig').value = p.ig||'';
   document.getElementById('fh_igc').value = p.igc||'';
+  atualizarIdadeIGC();
   document.getElementById('fh_apgar').value = p.apgar||'';
   document.getElementById('fh_acompanhante').value = p.acompanhante||'';
   restaurarCamposLivres(p);
@@ -1836,7 +1907,7 @@ function gerarEvolucaoTemplate(p){
       }).join('\n')
     : '  Nenhuma cultura em andamento.';
 
-  secoes.push(`3. Gerenciamento de Antimicrobianos\n• Antimicrobianos em uso:\n${usoAtualTxt}\n\n• Uso Prévio de antimicrobianos:\n${usoPrevioTxt}\n\n• História Prévia de Culturas:\n${historicoCulturasTxt}\n\n• Culturas em Andamento:\n${culturasAndamentoTxt}`);
+  secoes.push(`3. Gerenciamento de Antimicrobianos\n# Antimicrobianos em uso:\n${usoAtualTxt}\n\n# Uso Prévio de antimicrobianos:\n${usoPrevioTxt}\n\n# História Prévia de Culturas:\n${historicoCulturasTxt}\n\n# Culturas em Andamento:\n${culturasAndamentoTxt}`);
 
   // ---------- 4. EXAMES LABORATORIAIS ----------
   const examesLinhas = [];
@@ -1847,12 +1918,12 @@ function gerarEvolucaoTemplate(p){
   // ---------- 5. INTERAÇÕES E INCOMPATIBILIDADES ----------
   const inter = [];
   if(p.interacoes && p.interacoes.length){
-    inter.push('• Interações Medicamentosas clinicamente relevantes:\n' + p.interacoes.filter(i=>i.relevancia==='SIM').map(i=>`  - ${i.impacto||i.par||''}${i.manejo? ' '+i.manejo:''}`).join('\n'));
+    inter.push('# Interações Medicamentosas clinicamente relevantes:\n' + p.interacoes.filter(i=>i.relevancia==='SIM').map(i=>`  - ${i.impacto||i.par||''}${i.manejo? ' '+i.manejo:''}`).join('\n'));
   }
   if(p.incompat && p.incompat.length){
-    inter.push('• Incompatibilidades:\n' + p.incompat.filter(i=>i.relevancia==='SIM').map(i=>`  - ${i.par||''}${i.conduta? ' — '+i.conduta:''}`).join('\n'));
+    inter.push('# Incompatibilidades:\n' + p.incompat.filter(i=>i.relevancia==='SIM').map(i=>`  - ${i.par||''}${i.conduta? ' — '+i.conduta:''}`).join('\n'));
   }
-  secoes.push('5. Interações Medicamentosas e Incompatibilidades\n' + (inter.length? inter.join('\n') : '• Sem interações ou incompatibilidades clinicamente relevantes identificadas.'));
+  secoes.push('5. Interações Medicamentosas e Incompatibilidades\n' + (inter.length? inter.join('\n') : '# Sem interações ou incompatibilidades clinicamente relevantes identificadas.'));
 
   // ---------- 6. CONDUTA FARMACÊUTICA E PLANO TERAPÊUTICO ----------
   const condutaLinhas = [];
@@ -1871,8 +1942,8 @@ function gerarEvolucaoTemplate(p){
   const planoLinhas = [...frasesPadraoSelecionadas, ...planoLinhasCustom];
 
   let secaoConduta = '6. Conduta Farmacêutica e Plano Terapêutico\n';
-  secaoConduta += '• Conduta Farmacêutica:\n' + (condutaLinhas.length? condutaLinhas.join('\n') : '- Nenhuma conduta registrada hoje.');
-  secaoConduta += '\n\n• Plano Terapêutico Definido:\n' + (planoLinhas.length? planoLinhas.join('\n') : '- Não definido.');
+  secaoConduta += '# Conduta Farmacêutica:\n' + (condutaLinhas.length? condutaLinhas.join('\n') : '- Nenhuma conduta registrada hoje.');
+  secaoConduta += '\n\n# Plano Terapêutico Definido:\n' + (planoLinhas.length? planoLinhas.join('\n') : '- Não definido.');
   secoes.push(secaoConduta);
 
   return gerarCabecalhoEvolucao(p) + '\n\n' + secoes.join('\n\n');
@@ -2392,6 +2463,12 @@ async function authHeaders(){
   };
 }
 
+// Guarda uma "foto" de cada paciente no momento em que foi carregado/salvo por último
+// neste computador. Serve pra só enviar ao banco quem REALMENTE mudou aqui — assim,
+// se outra pessoa (em outro computador) atualizou um paciente que eu nem abri, meu
+// salvamento automático não manda de volta a versão antiga dele por cima da dela.
+let pacientesOriginais = {};
+
 async function carregarEstado(){
   if(!equipeSenha) return;
   try{
@@ -2399,6 +2476,8 @@ async function carregarEstado(){
     if(resp.status === 401) throw new Error('senha_invalida');
     if(!resp.ok) throw new Error('Erro ' + resp.status);
     pacientes = await resp.json();
+    pacientesOriginais = {};
+    pacientes.forEach(p => { pacientesOriginais[p.id] = JSON.stringify(p); });
     renderLista();
     const ind = document.getElementById('autosaveInd');
     if(ind) ind.textContent = 'Sincronizado ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
@@ -2413,11 +2492,20 @@ async function carregarEstado(){
   }
 }
 
+function pacientesModificadosAqui(){
+  return pacientes.filter(p => p._novo || JSON.stringify(p) !== pacientesOriginais[p.id]);
+}
+
+// Retorna true só se TUDO que precisava ser salvo foi de fato confirmado pelo servidor.
+// Quem usa isso (ex: Baixar Backup) precisa saber se pode confiar no estado atual ou não.
 async function salvarEstado(){
-  if(!equipeSenha || !pacientes.length) return;
+  if(!equipeSenha || !pacientes.length) return true;
+  const modificados = pacientesModificadosAqui();
+  if(!modificados.length) return true;
+  let tudoOk = true;
   try{
     const headers = await authHeaders();
-    for(const p of pacientes){
+    for(const p of modificados){
       if(p._novo){
         const resp = await fetch('/api/pacientes', { method:'POST', headers, body: JSON.stringify(p) });
         if(resp.ok){
@@ -2426,18 +2514,49 @@ async function salvarEstado(){
           p.id = data.id;
           delete p._novo;
           if(fichaAtivaId === idAntigo) fichaAtivaId = data.id;
+          pacientesOriginais[p.id] = JSON.stringify(p);
+        } else {
+          tudoOk = false;
         }
       } else {
-        await fetch('/api/pacientes', { method:'PUT', headers, body: JSON.stringify({ id: p.id, dados: p }) });
+        const resp = await fetch('/api/pacientes', { method:'PUT', headers, body: JSON.stringify({ id: p.id, dados: p }) });
+        if(resp.ok){
+          pacientesOriginais[p.id] = JSON.stringify(p);
+        } else {
+          tudoOk = false; // NÃO marca como salvo -- assim essa edição é tentada de novo no próximo ciclo
+        }
       }
     }
     const ind = document.getElementById('autosaveInd');
-    if(ind) ind.textContent = 'Salvo ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
-  } catch(e){ console.warn('Falha ao salvar no banco:', e); }
+    if(ind) ind.textContent = tudoOk
+      ? 'Salvo ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})
+      : '⚠️ Falha ao salvar — tentando de novo...';
+  } catch(e){
+    console.warn('Falha ao salvar no banco:', e);
+    tudoOk = false;
+    const ind = document.getElementById('autosaveInd');
+    if(ind) ind.textContent = '⚠️ Sem conexão — suas edições estão só neste navegador por enquanto.';
+  }
+  return tudoOk;
+}
+
+// Salvamento "ao sair da página" — fetch() normal costuma ser cortado pelo navegador
+// no meio do caminho quando a aba está fechando. sendBeacon() é a ferramenta própria
+// do navegador pra isso: ele garante o envio mesmo depois da página já ter sumido.
+// Também manda só quem foi modificado aqui, pelo mesmo motivo do salvarEstado().
+function salvarEstadoAoSair(){
+  if(!equipeSenha || !pacientes.length) return;
+  const modificados = pacientesModificadosAqui();
+  if(!modificados.length) return;
+  if(!navigator.sendBeacon) { salvarEstado(); return; } // navegador muito antigo: tenta do jeito normal mesmo
+  const payload = JSON.stringify({ senha: equipeSenha, nome: equipeNome, pacientesBatch: modificados });
+  const blob = new Blob([payload], { type: 'application/json' });
+  navigator.sendBeacon('/api/pacientes', blob);
 }
 
 setInterval(salvarEstado, 8000);
-window.addEventListener('beforeunload', salvarEstado);
+window.addEventListener('pagehide', salvarEstadoAoSair);
+window.addEventListener('beforeunload', salvarEstadoAoSair);
 
 function esconderLoginGate(){
   document.getElementById('loginGate').style.display = 'none';
@@ -2490,6 +2609,67 @@ function sairApp(){
     }
   } catch(e){}
 })();
+
+function imprimirCulturasAndamento(){
+  const ativos = pacientes.filter(p=>p.status==='Ativo');
+  const linhas = [];
+  ativos.forEach(p=>{
+    (p.culturas||[]).forEach(c=>{
+      if(c.resultadoFinal === 'E/A (Em Andamento)'){
+        linhas.push({
+          paciente: p.nome, leito: p.leito||'—', setor: p.setor,
+          material: c.material||'—',
+          dataColeta: c.dataColeta ? formatarDataBR(c.dataColeta) : '—',
+          resParcial: c.resParcial||'—',
+          resultadoFinal: c.resultadoFinal||'—',
+          padrao: c.padrao||'—',
+        });
+      }
+    });
+  });
+
+  if(!linhas.length){ showToast('Nenhuma cultura em andamento no momento.'); return; }
+
+  const corpoLinhas = linhas.map(l => `<tr>
+      <td><b>${l.paciente}</b><br><span class="sub">${l.leito} · ${l.setor}</span></td>
+      <td>${l.material}</td>
+      <td>${l.dataColeta}</td>
+      <td>${l.resParcial}</td>
+      <td>${l.resultadoFinal}</td>
+      <td>${l.padrao}</td>
+    </tr>`).join('');
+
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Culturas em Andamento</title>
+  <style>
+    @page { size: landscape; margin: 12mm; }
+    body{ font-family:'Inter',Arial,sans-serif; color:#1C2233; margin:0; padding:16px; }
+    h1{ font-size:16px; color:#1D4ED8; margin:0 0 2px; }
+    .sub-info{ font-size:11px; color:#6B7690; margin-bottom:14px; }
+    table{ width:100%; border-collapse:collapse; font-size:11px; }
+    th{ background:#2563EB; color:#fff; text-align:left; padding:6px 8px; }
+    td{ border:1px solid #D7DEEA; padding:6px 8px; vertical-align:top; }
+    tr:nth-child(even) td{ background:#F4F6FA; }
+    .sub{ color:#6B7690; font-size:9.5px; }
+    .rodape{ margin-top:24px; text-align:center; font-size:9px; color:#9AA4B8; font-style:italic; }
+    @media print { .no-print{ display:none; } }
+  </style></head>
+  <body>
+    <button class="no-print" onclick="window.print()" style="margin-bottom:14px;padding:10px 18px;background:#2563EB;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar como PDF</button>
+    <h1>FARMÁCIA CLÍNICA — HMAF &nbsp;|&nbsp; Culturas em Andamento</h1>
+    <div class="sub-info">Data: ${hoje} &nbsp;&nbsp;&nbsp; Total de culturas pendentes: ${linhas.length}</div>
+    <table>
+      <thead><tr><th>Paciente</th><th>Tipo de Cultura</th><th>Data da Coleta</th><th>Crescimento Parcial</th><th>Crescimento Final</th><th>Padrão de Resistência</th></tr></thead>
+      <tbody>${corpoLinhas}</tbody>
+    </table>
+    <div class="rodape">Gerado automaticamente a partir da Ficha de Acompanhamento Farmacoterapêutico</div>
+  </body></html>`;
+
+  const janela = window.open('', '_blank');
+  if(!janela){ showToast('Não foi possível abrir a janela de impressão. Verifique se o navegador está bloqueando pop-ups.'); return; }
+  janela.document.write(html);
+  janela.document.close();
+}
 
 function imprimirResumoVisita(){
   const ativos = pacientes.filter(p=>p.status==='Ativo');
@@ -2570,9 +2750,33 @@ function imprimirResumoVisita(){
   janela.document.close();
 }
 
-function exportarBackup(){
-  salvarEstado();
-  const payload = { pacientes, proximoId, exportadoEm: new Date().toISOString() };
+async function exportarBackup(){
+  // 1) Envia primeiro as MINHAS alterações pendentes, pra não perder nada meu.
+  const salvouTudo = await salvarEstado();
+
+  // 2) Só busca a versão do banco pra substituir a tela SE o passo 1 confirmou sucesso.
+  //    Se o salvamento falhou (sem internet, etc.), buscar agora pegaria uma versão
+  //    SEM a sua edição e sobrescreveria ela tanto na tela quanto no próprio backup --
+  //    exatamente o tipo de perda de dado que isso existe pra evitar.
+  if(!salvouTudo){
+    showToast('⚠️ Não consegui confirmar que suas últimas edições foram salvas no banco (verifique sua internet). O backup vai sair com o que está nesta tela, mas tente de novo quando a conexão voltar.');
+  } else if(equipeSenha){
+    try{
+      const resp = await fetch('/api/pacientes', { headers: await authHeaders() });
+      if(resp.ok){
+        pacientes = await resp.json();
+        pacientesOriginais = {};
+        pacientes.forEach(p => { pacientesOriginais[p.id] = JSON.stringify(p); });
+        renderLista();
+      } else {
+        showToast('Não foi possível confirmar a versão mais recente do banco — o backup pode não incluir edições de outras pessoas feitas agora.');
+      }
+    } catch(e){
+      showToast('Sem conexão com o banco — o backup vai sair só com os dados já carregados neste navegador.');
+    }
+  }
+
+  const payload = { pacientes, exportadoEm: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2580,27 +2784,51 @@ function exportarBackup(){
   a.download = `backup_farmacia_clinica_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('Backup baixado com sucesso!');
+  if(salvouTudo) showToast('Backup baixado com sucesso — incluindo as edições mais recentes do banco!');
 }
 
 function importarBackup(input){
   const file = input.files[0];
   if(!file) return;
+  const confirmado = confirm('Vou conferir quais pacientes desse arquivo já existem no banco (pra não duplicar) e adicionar só os que faltam. Deseja continuar?');
+  if(!confirmado){ input.value=''; return; }
   const reader = new FileReader();
-  reader.onload = (e)=>{
+  reader.onload = async (e)=>{
     try{
       const payload = JSON.parse(e.target.result);
       if(!Array.isArray(payload.pacientes)) throw new Error('Arquivo inválido');
-      // Todo paciente restaurado de um backup antigo (localStorage) é tratado como
-      // novo registro e enviado ao banco de dados compartilhado no próximo salvamento.
-      const restaurados = payload.pacientes.map(p=> Object.assign({}, p, {
-        id: -(Date.now() + Math.floor(Math.random()*100000)),
-        _novo: true
-      }));
-      pacientes = pacientes.concat(restaurados);
+
+      // Busca quem JÁ existe no banco agora, pra decidir o que é realmente novo.
+      let existentes = pacientes.slice();
+      if(equipeSenha){
+        try{
+          const resp = await fetch('/api/pacientes', { headers: await authHeaders() });
+          if(resp.ok) existentes = await resp.json();
+        }catch(err){}
+      }
+      const idsExistentes = new Set(existentes.map(p=>p.id));
+
+      let jaExistiam = 0;
+      const novos = [];
+      payload.pacientes.forEach(p=>{
+        if(p.id!==undefined && p.id!==null && idsExistentes.has(p.id)){
+          jaExistiam++;  // já está no banco com esse id -- não duplica, não sobrescreve
+          return;
+        }
+        novos.push(Object.assign({}, p, {
+          id: -(Date.now() + Math.floor(Math.random()*1000000)),
+          _novo: true
+        }));
+      });
+
+      pacientes = existentes.concat(novos);
+      pacientesOriginais = {};
+      existentes.forEach(p => { pacientesOriginais[p.id] = JSON.stringify(p); });
       renderLista();
-      salvarEstado();
-      showToast(`Backup restaurado! ${restaurados.length} paciente(s) sendo migrado(s) para o banco de dados...`);
+      await salvarEstado();
+
+      const detalhe = jaExistiam ? ` ${jaExistiam} já existiam no banco e não foram duplicados.` : '';
+      showToast(`Backup restaurado! ${novos.length} paciente(s) novo(s) adicionado(s).${detalhe}`);
     } catch(err){
       showToast('Não foi possível ler esse arquivo de backup.');
     }
