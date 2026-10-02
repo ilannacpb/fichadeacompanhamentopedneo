@@ -2554,7 +2554,57 @@ function salvarEstadoAoSair(){
   navigator.sendBeacon('/api/pacientes', blob);
 }
 
+// Busca em segundo plano o que outras pessoas (em outros computadores) salvaram,
+// e atualiza a lista local com isso -- SEM apagar edições que eu ainda não enviei.
+// Sem isso, cada computador só via o banco uma vez (no login) e nunca mais, então
+// uma edição de outra pessoa num paciente que eu também tinha aberto podia ser
+// sobrescrita por engano na próxima vez que eu salvasse algo naquele mesmo paciente.
+// Mescla CAMPO A CAMPO: parte da versão mais atual do servidor, e só mantém os campos
+// que eu mesma alterei aqui (comparando com a "foto" de quando carreguei esse paciente).
+// Assim, se eu mudei o diagnóstico e outra pessoa mudou a idade desse mesmo paciente,
+// as duas edições sobrevivem -- em vez de uma apagar a outra por serem do mesmo registro.
+function mesclarComEdicoesLocais(pServidor, pLocal, originalAnteriorJSON){
+  const mesclado = Object.assign({}, pServidor);
+  if(!originalAnteriorJSON) return mesclado;
+  let original;
+  try{ original = JSON.parse(originalAnteriorJSON); }catch(e){ return mesclado; }
+  Object.keys(pLocal).forEach(campo=>{
+    if(JSON.stringify(pLocal[campo]) !== JSON.stringify(original[campo])){
+      mesclado[campo] = pLocal[campo]; // esse campo específico eu mudei aqui -- mantém o meu
+    }
+  });
+  return mesclado;
+}
+
+async function atualizarDeOutrosComputadores(){
+  if(!equipeSenha || !pacientes.length) return;
+  try{
+    const resp = await fetch('/api/pacientes', { headers: await authHeaders() });
+    if(!resp.ok) return;
+    const doServidor = await resp.json();
+
+    const novaLista = doServidor.map(pServidor=>{
+      const pLocal = pacientes.find(p=>p.id===pServidor.id);
+      if(!pLocal) return pServidor; // paciente que eu nem tinha carregado (criado em outro lugar)
+      const original = pacientesOriginais[pServidor.id];
+      const mesclado = mesclarComEdicoesLocais(pServidor, pLocal, original);
+      return mesclado;
+    });
+    // pacientesOriginais passa a refletir a versão do servidor agora (base pra próxima comparação),
+    // menos os campos que eu ainda tenho pendente de enviar -- esses continuam marcados como
+    // "diferentes do original" até o próximo salvamento confirmar.
+    doServidor.forEach(pServidor=>{ pacientesOriginais[pServidor.id] = JSON.stringify(pServidor); });
+
+    // Pacientes criados aqui mesmo e ainda não confirmados no banco (sem id real ainda)
+    pacientes.filter(p=>p._novo).forEach(p=> novaLista.push(p));
+
+    pacientes = novaLista;
+    renderLista();
+  } catch(e){ console.warn('Falha ao sincronizar com outros computadores:', e); }
+}
+
 setInterval(salvarEstado, 8000);
+setInterval(atualizarDeOutrosComputadores, 15000);
 window.addEventListener('pagehide', salvarEstadoAoSair);
 window.addEventListener('beforeunload', salvarEstadoAoSair);
 
@@ -2806,29 +2856,66 @@ function importarBackup(input){
           if(resp.ok) existentes = await resp.json();
         }catch(err){}
       }
-      const idsExistentes = new Set(existentes.map(p=>p.id));
+      const mapaExistentes = new Map(existentes.map(p=>[p.id, p]));
 
-      let jaExistiam = 0;
+      // Garante uma estrutura mínima, mesmo em backups bem antigos que não tenham
+      // todos os campos que o app usa hoje -- evita que a tela quebre no meio da importação.
+      function normalizarPaciente(p){
+        return Object.assign({ chips:{}, dva:[], sedacao:[], sedacaoInterm:[], reconc:[], atms:[],
+          culturas:[], interacoes:[], incompat:[], intervencoes:[], acompanhamentos:[],
+          reconciliacoes:[], planoFrasesPadrao:[], evolucoes:[] }, p);
+      }
+
       const novos = [];
+      const encontradosNoBackup = []; // pacientes do backup cujo id já existe no banco
       payload.pacientes.forEach(p=>{
-        if(p.id!==undefined && p.id!==null && idsExistentes.has(p.id)){
-          jaExistiam++;  // já está no banco com esse id -- não duplica, não sobrescreve
+        if(p.id!==undefined && p.id!==null && mapaExistentes.has(p.id)){
+          encontradosNoBackup.push(normalizarPaciente(p));
           return;
         }
-        novos.push(Object.assign({}, p, {
+        novos.push(normalizarPaciente(Object.assign({}, p, {
           id: -(Date.now() + Math.floor(Math.random()*1000000)),
           _novo: true
-        }));
+        })));
       });
 
-      pacientes = existentes.concat(novos);
+      // Pergunta separada: só se existir algum paciente do backup que já está no banco,
+      // pergunta se quer FORÇAR a versão do backup por cima da atual (com o risco claro).
+      let atualizarExistentes = false;
+      if(encontradosNoBackup.length){
+        atualizarExistentes = confirm(
+          `${encontradosNoBackup.length} paciente(s) desse backup já existem no banco.\n\n` +
+          `Quer também ATUALIZAR esses com os dados do arquivo?\n\n` +
+          `⚠️ ATENÇÃO: se alguém editou esses mesmos pacientes DEPOIS que esse backup foi gerado, ` +
+          `essa atualização vai sobrescrever a edição mais recente dela com a versão mais antiga do backup.\n\n` +
+          `Clique OK para atualizar também, ou Cancelar para manter a versão atual deles (só adiciona os que faltam).`
+        );
+      }
+
+      let listaFinal = existentes.slice();
+      if(atualizarExistentes){
+        encontradosNoBackup.forEach(pBackup=>{
+          const idx = listaFinal.findIndex(p=>p.id===pBackup.id);
+          if(idx>=0) listaFinal[idx] = Object.assign({}, pBackup, { id: pBackup.id });
+        });
+      }
+      pacientes = listaFinal.concat(novos);
+
+      // pacientesOriginais reflete o que JÁ ESTAVA no banco antes desta importação --
+      // assim, os que acabaram de ser sobrescritos pelo backup ficam marcados como
+      // "modificados aqui" e são enviados no próximo salvamento; os demais não.
       pacientesOriginais = {};
       existentes.forEach(p => { pacientesOriginais[p.id] = JSON.stringify(p); });
       renderLista();
       await salvarEstado();
 
-      const detalhe = jaExistiam ? ` ${jaExistiam} já existiam no banco e não foram duplicados.` : '';
-      showToast(`Backup restaurado! ${novos.length} paciente(s) novo(s) adicionado(s).${detalhe}`);
+      const partesMsg = [`${novos.length} paciente(s) novo(s) adicionado(s).`];
+      if(encontradosNoBackup.length){
+        partesMsg.push(atualizarExistentes
+          ? `${encontradosNoBackup.length} paciente(s) existentes foram ATUALIZADOS com os dados do backup.`
+          : `${encontradosNoBackup.length} já existiam e mantiveram a versão atual (não foram duplicados nem sobrescritos).`);
+      }
+      showToast(`Backup restaurado! ${partesMsg.join(' ')}`);
     } catch(err){
       showToast('Não foi possível ler esse arquivo de backup.');
     }
