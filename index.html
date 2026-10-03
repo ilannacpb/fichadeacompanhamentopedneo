@@ -628,7 +628,7 @@
       <div style="font-weight:800;font-size:14px;color:#141926;margin:26px 0 4px;padding-top:10px;border-top:1px solid #E4E9F2">Reconciliação Medicamentosa</div>
 
       <div class="lp-metrics" style="grid-template-columns:repeat(2,1fr)">
-        <div class="lp-metric"><div class="lbl">RECONCILIAÇÕES MEDICAMENTOSAS</div><div class="num num-dark" id="ind_recon_total">0</div><div class="cap">Eventos registrados (por paciente/dia)</div></div>
+        <div class="lp-metric"><div class="lbl">RECONCILIAÇÕES MEDICAMENTOSAS</div><div class="num num-dark" id="ind_recon_total">0</div><div class="cap">Eventos registrados (por paciente/dia) · somente UTI ped</div></div>
         <div class="lp-metric"><div class="lbl">PACIENTES RECONCILIADOS</div><div class="num num-green" id="ind_recon_pacientes">0</div><div class="cap" id="ind_recon_pacientes_cap">0 de 0 pacientes</div></div>
       </div>
 
@@ -873,6 +873,11 @@ function registrarReconciliacao(p){
   if(!p.reconciliacoes) p.reconciliacoes = [];
   if(!p.reconciliacoes.some(r=>r.data===hoje)) p.reconciliacoes.push({ data: hoje, setor: p.setor });
 }
+// Setores cujos pacientes entram nos indicadores de reconciliação medicamentosa
+// (painel da tela de Pacientes, aba Indicadores e exportação em Excel).
+const SETORES_RECONCILIACAO = ['UTI ped'];
+function contaParaReconciliacao(setor){ return SETORES_RECONCILIACAO.includes(setor); }
+
 function reconciliacaoFoiFeita(p){
   return !!(p.chips.usoDomiciliar && p.chips.usoDomiciliar.length);
 }
@@ -915,7 +920,7 @@ function renderResumoReconciliacao(){
   wrap.style.display = 'block';
 
   // UTI neo e UCSIN não entram nesse indicador -- só UTI ped conta pra reconciliação medicamentosa.
-  const ativos = pacientes.filter(p=>p.status==='Ativo' && p.setor==='UTI ped');
+  const ativos = pacientes.filter(p=>p.status==='Ativo' && contaParaReconciliacao(p.setor));
   const reconciliados = ativos.filter(reconciliacaoFoiFeita);
   const pendentes = ativos.filter(p=>!reconciliacaoFoiFeita(p));
 
@@ -2159,7 +2164,11 @@ function calcularAgregados(){
 
   // Reconciliações: uma linha por evento (paciente + data)
   const reconciliacoesTodas = [];
-  pacientes.forEach(p=>{ (p.reconciliacoes||[]).forEach(r=> reconciliacoesTodas.push({paciente:p.nome, registro:p.prontuario, setor:r.setor, data:r.data})); });
+  pacientes.forEach(p=>{ (p.reconciliacoes||[]).forEach(r=>{
+    const setorEvento = r.setor || p.setor;
+    if(!contaParaReconciliacao(setorEvento)) return;
+    reconciliacoesTodas.push({paciente:p.nome, registro:p.prontuario, setor:setorEvento, data:r.data});
+  }); });
   const totalReconciliacoes = reconciliacoesTodas.length;
   const reconMesCount = {};
   reconciliacoesTodas.forEach(r=>{
@@ -2171,6 +2180,7 @@ function calcularAgregados(){
   // Taxa de reconciliação por setor: % de pacientes daquele setor com ao menos 1 reconciliação
   const reconSetorStats = {};
   pacientes.forEach(p=>{
+    if(!contaParaReconciliacao(p.setor)) return;
     if(!reconSetorStats[p.setor]) reconSetorStats[p.setor] = {totalPacientes:0, reconciliados:0};
     reconSetorStats[p.setor].totalPacientes++;
     if((p.reconciliacoes||[]).length) reconSetorStats[p.setor].reconciliados++;
@@ -2239,10 +2249,10 @@ function renderIndicadores(){
 
   // Reconciliações
   document.getElementById('ind_recon_total').textContent = totalReconciliacoes;
-  const totalPacientes = pacientes.length;
-  const pacientesReconciliados = pacientes.filter(p=>(p.reconciliacoes||[]).length).length;
+  const totalPacientes = pacientes.filter(p=>contaParaReconciliacao(p.setor)).length;
+  const pacientesReconciliados = pacientes.filter(p=>contaParaReconciliacao(p.setor) && (p.reconciliacoes||[]).length).length;
   document.getElementById('ind_recon_pacientes').textContent = pacientesReconciliados;
-  document.getElementById('ind_recon_pacientes_cap').textContent = `${pacientesReconciliados} de ${totalPacientes} pacientes`;
+  document.getElementById('ind_recon_pacientes_cap').textContent = `${pacientesReconciliados} de ${totalPacientes} pacientes · ${SETORES_RECONCILIACAO.join(', ')}`;
   document.getElementById('ind_recon_meses').innerHTML = barsHtml(reconMesCount, true, totalReconciliacoes);
 
   const setoresReconOrdenados = Object.keys(reconSetorStats).sort();
@@ -2340,7 +2350,7 @@ async function exportarExcel(){
   wb.created = new Date();
 
   // ---------- Aba 1: Resumo Geral ----------
-  const pacientesReconciliados = pacientes.filter(p=>(p.reconciliacoes||[]).length).length;
+  const pacientesReconciliados = pacientes.filter(p=>contaParaReconciliacao(p.setor) && (p.reconciliacoes||[]).length).length;
   const wsResumo = wb.addWorksheet('Resumo Geral');
   wsResumo.columns = [{width:42},{width:16}];
   wsResumo.addRow(['Indicador','Valor']);
@@ -2353,8 +2363,8 @@ async function exportarExcel(){
     ['Pendentes de resposta', pendentes],
     ['Não aceitas com justificativa clínica', recCJ],
     ['Não aceitas sem justificativa clínica', recSJ],
-    ['Total de reconciliações medicamentosas', totalReconciliacoes],
-    ['Pacientes reconciliados', pacientesReconciliados],
+    [`Total de reconciliações medicamentosas (${SETORES_RECONCILIACAO.join(', ')})`, totalReconciliacoes],
+    [`Pacientes reconciliados (${SETORES_RECONCILIACAO.join(', ')})`, pacientesReconciliados],
     ['Total de pacientes cadastrados', pacientes.length],
   ];
   linhasResumo.forEach(l=> wsResumo.addRow(l));
