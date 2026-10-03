@@ -269,6 +269,11 @@
       <div id="resumoReconciliacaoLista" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
     </div>
 
+    <div id="barraSelecao" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:#FEF3C7;border-radius:10px;margin-bottom:10px;font-weight:700;font-size:13px;color:#92400E">
+      <span><span id="qtdSelecionados">0</span> ficha(s) selecionada(s)</span>
+      <button class="btn btn-sm" style="background:var(--danger);color:#fff" onclick="confirmarExclusaoMultipla()">🗑️ Excluir selecionadas</button>
+      <button class="btn btn-outline btn-sm" onclick="limparSelecao()">Cancelar seleção</button>
+    </div>
     <div class="plist" id="plist"></div>
     <div class="empty" id="plistVazio">Nenhum paciente cadastrado. Clique em "+ Novo Paciente" para abrir uma ficha.</div>
   </section>
@@ -909,7 +914,8 @@ function renderResumoReconciliacao(){
   if(abaPacientesAtual !== 'ativos'){ wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
 
-  const ativos = pacientes.filter(p=>p.status==='Ativo');
+  // UTI neo e UCSIN não entram nesse indicador -- só UTI ped conta pra reconciliação medicamentosa.
+  const ativos = pacientes.filter(p=>p.status==='Ativo' && p.setor==='UTI ped');
   const reconciliados = ativos.filter(reconciliacaoFoiFeita);
   const pendentes = ativos.filter(p=>!reconciliacaoFoiFeita(p));
 
@@ -922,6 +928,48 @@ function renderResumoReconciliacao(){
   const chipPendente = p => `<span class="chip-toggle" style="background:#FEF3C7;border-color:#FDE68A;color:#92400E;cursor:pointer" onclick="abrirFicha(${p.id})">⏳ ${p.nome}</span>`;
 
   el.innerHTML = reconciliados.map(chipReconciliado).join('') + pendentes.map(chipPendente).join('');
+}
+
+let selecionados = new Set();
+function toggleSelecaoPaciente(id, checked){
+  if(checked) selecionados.add(id); else selecionados.delete(id);
+  atualizarBarraSelecao();
+}
+function limparSelecao(){
+  selecionados.clear();
+  renderLista();
+}
+function atualizarBarraSelecao(){
+  const barra = document.getElementById('barraSelecao');
+  if(!barra) return;
+  if(selecionados.size){
+    barra.style.display = 'flex';
+    document.getElementById('qtdSelecionados').textContent = selecionados.size;
+  } else {
+    barra.style.display = 'none';
+  }
+}
+async function confirmarExclusaoMultipla(){
+  const qtd = selecionados.size;
+  if(!qtd) return;
+  const confirmado = confirm(`Excluir ${qtd} ficha(s) selecionada(s)? Isso não pode ser desfeito.`);
+  if(!confirmado) return;
+  const idsExcluir = [...selecionados];
+  const comIdReal = idsExcluir.filter(id=>{
+    const p = pacientes.find(x=>x.id===id);
+    return p && !p._novo;
+  });
+  pacientes = pacientes.filter(p=> !selecionados.has(p.id));
+  selecionados.clear();
+  renderLista();
+  showToast(`${qtd} ficha(s) excluída(s).`);
+  if(equipeSenha && comIdReal.length){
+    const headers = await authHeaders();
+    for(const id of comIdReal){
+      try{ await fetch('/api/pacientes', { method:'DELETE', headers, body: JSON.stringify({ id }) }); }
+      catch(e){ console.warn('Falha ao excluir no banco:', id, e); }
+    }
+  }
 }
 
 function renderLista(){
@@ -963,10 +1011,13 @@ function renderLista(){
     }).join(', ') : '';
     return `
     <div class="pcard">
-      <div>
-        <div class="pname">${p.nome} <span class="mrn">${p.prontuario}</span> <span class="status-pill ${p.status==='Ativo'?'status-ativo':'status-alta'}">${p.status}</span> <span class="setor-pill">${p.setor}</span></div>
-        <div class="pmeta">Leito ${p.leito||'—'} · ${p.idade||'idade não informada'} ${p.diagnostico? '· '+p.diagnostico : ''}</div>
-        ${mesesTxt ? `<div class="pmeta">Acompanhado em: ${mesesTxt}</div>` : ''}
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <input type="checkbox" style="margin-top:4px;width:17px;height:17px;cursor:pointer" ${selecionados.has(p.id)?'checked':''} onchange="toggleSelecaoPaciente(${p.id}, this.checked)" title="Selecionar pra excluir em lote">
+        <div>
+          <div class="pname">${p.nome} <span class="mrn">${p.prontuario}</span> <span class="status-pill ${p.status==='Ativo'?'status-ativo':'status-alta'}">${p.status}</span> <span class="setor-pill">${p.setor}</span></div>
+          <div class="pmeta">Leito ${p.leito||'—'} · ${p.idade||'idade não informada'} ${p.diagnostico? '· '+p.diagnostico : ''}</div>
+          ${mesesTxt ? `<div class="pmeta">Acompanhado em: ${mesesTxt}</div>` : ''}
+        </div>
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-outline btn-sm" onclick="abrirFicha(${p.id})">Abrir Ficha →</button>
@@ -976,6 +1027,7 @@ function renderLista(){
       </div>
     </div>`;
   }).join('');
+  atualizarBarraSelecao();
 }
 
 let idParaExcluir = null;
@@ -2469,13 +2521,21 @@ async function authHeaders(){
 // salvamento automático não manda de volta a versão antiga dele por cima da dela.
 let pacientesOriginais = {};
 
+// "_novo" é uma marca só deste navegador ("ainda não existe no banco"). Ela nunca pode
+// ser tratada como dado da ficha: se voltasse do banco, a ficha seria enviada de novo
+// como se fosse nova, criando uma cópia nova a cada ciclo.
+function limparMarcasInternas(p){
+  delete p._novo;
+  return p;
+}
+
 async function carregarEstado(){
   if(!equipeSenha) return;
   try{
     const resp = await fetch('/api/pacientes', { headers: await authHeaders() });
     if(resp.status === 401) throw new Error('senha_invalida');
     if(!resp.ok) throw new Error('Erro ' + resp.status);
-    pacientes = await resp.json();
+    pacientes = (await resp.json()).map(limparMarcasInternas);
     pacientesOriginais = {};
     pacientes.forEach(p => { pacientesOriginais[p.id] = JSON.stringify(p); });
     renderLista();
@@ -2496,37 +2556,58 @@ function pacientesModificadosAqui(){
   return pacientes.filter(p => p._novo || JSON.stringify(p) !== pacientesOriginais[p.id]);
 }
 
+// Salvamentos nunca rodam em paralelo: quando dois rodavam juntos (ex.: o automático e o do
+// "Baixar Backup"), ambos viam a mesma ficha nova e a criavam duas vezes no banco.
+let filaSalvamento = Promise.resolve(true);
+let salvandoAgora = false;
+let contadorSalvamentos = 0; // sobe a cada rodada que realmente enviou algo ao banco
+
 // Retorna true só se TUDO que precisava ser salvo foi de fato confirmado pelo servidor.
 // Quem usa isso (ex: Baixar Backup) precisa saber se pode confiar no estado atual ou não.
-async function salvarEstado(){
+function salvarEstado(){
+  filaSalvamento = filaSalvamento.then(() => salvarEstadoInterno(), () => salvarEstadoInterno());
+  return filaSalvamento;
+}
+
+async function salvarEstadoInterno(){
   if(!equipeSenha || !pacientes.length) return true;
   const modificados = pacientesModificadosAqui();
   if(!modificados.length) return true;
+  salvandoAgora = true;
   let tudoOk = true;
   try{
     const headers = await authHeaders();
     for(const p of modificados){
+      // Foto do que está sendo enviado AGORA. Se eu continuar editando enquanto o envio está
+      // em andamento, essa edição extra continua marcada como pendente (em vez de ser dada
+      // como "já salva" por engano).
+      const fotoStr = JSON.stringify(p);
       if(p._novo){
-        const resp = await fetch('/api/pacientes', { method:'POST', headers, body: JSON.stringify(p) });
+        const foto = JSON.parse(fotoStr); delete foto._novo;
+        const corpo = JSON.parse(fotoStr); delete corpo._novo; delete corpo.id; // o id verdadeiro é o banco quem dá
+        const resp = await fetch('/api/pacientes', { method:'POST', headers, body: JSON.stringify(corpo) });
         if(resp.ok){
           const data = await resp.json();
           const idAntigo = p.id;
           p.id = data.id;
           delete p._novo;
           if(fichaAtivaId === idAntigo) fichaAtivaId = data.id;
-          pacientesOriginais[p.id] = JSON.stringify(p);
+          if(selecionados.has(idAntigo)){ selecionados.delete(idAntigo); selecionados.add(data.id); }
+          foto.id = data.id;
+          pacientesOriginais[data.id] = JSON.stringify(foto);
         } else {
           tudoOk = false;
         }
       } else {
-        const resp = await fetch('/api/pacientes', { method:'PUT', headers, body: JSON.stringify({ id: p.id, dados: p }) });
+        const resp = await fetch('/api/pacientes', { method:'PUT', headers, body: JSON.stringify({ id: p.id, dados: JSON.parse(fotoStr) }) });
         if(resp.ok){
-          pacientesOriginais[p.id] = JSON.stringify(p);
+          pacientesOriginais[p.id] = fotoStr;
         } else {
           tudoOk = false; // NÃO marca como salvo -- assim essa edição é tentada de novo no próximo ciclo
         }
       }
     }
+    contadorSalvamentos++;
     const ind = document.getElementById('autosaveInd');
     if(ind) ind.textContent = tudoOk
       ? 'Salvo ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})
@@ -2536,6 +2617,8 @@ async function salvarEstado(){
     tudoOk = false;
     const ind = document.getElementById('autosaveInd');
     if(ind) ind.textContent = '⚠️ Sem conexão — suas edições estão só neste navegador por enquanto.';
+  } finally {
+    salvandoAgora = false;
   }
   return tudoOk;
 }
@@ -2544,11 +2627,17 @@ async function salvarEstado(){
 // no meio do caminho quando a aba está fechando. sendBeacon() é a ferramenta própria
 // do navegador pra isso: ele garante o envio mesmo depois da página já ter sumido.
 // Também manda só quem foi modificado aqui, pelo mesmo motivo do salvarEstado().
+let ultimoEnvioAoSair = 0;
 function salvarEstadoAoSair(){
   if(!equipeSenha || !pacientes.length) return;
+  // "pagehide" e "beforeunload" disparam juntos ao fechar a aba; sem esse intervalo o envio
+  // saía duas vezes e as fichas novas eram criadas em duplicidade.
+  const agora = Date.now();
+  if(agora - ultimoEnvioAoSair < 3000) return;
   const modificados = pacientesModificadosAqui();
   if(!modificados.length) return;
   if(!navigator.sendBeacon) { salvarEstado(); return; } // navegador muito antigo: tenta do jeito normal mesmo
+  ultimoEnvioAoSair = agora;
   const payload = JSON.stringify({ senha: equipeSenha, nome: equipeNome, pacientesBatch: modificados });
   const blob = new Blob([payload], { type: 'application/json' });
   navigator.sendBeacon('/api/pacientes', blob);
@@ -2578,10 +2667,15 @@ function mesclarComEdicoesLocais(pServidor, pLocal, originalAnteriorJSON){
 
 async function atualizarDeOutrosComputadores(){
   if(!equipeSenha || !pacientes.length) return;
+  if(salvandoAgora) return; // espera o salvamento terminar; a próxima rodada atualiza
+  const contadorAntes = contadorSalvamentos;
   try{
     const resp = await fetch('/api/pacientes', { headers: await authHeaders() });
     if(!resp.ok) return;
-    const doServidor = await resp.json();
+    const doServidor = (await resp.json()).map(limparMarcasInternas);
+    // Se um salvamento rodou enquanto eu buscava, essa resposta pode estar desatualizada
+    // (ex.: sem uma ficha que acabou de ser criada) e apagaria ela da tela. Descarta; a próxima rodada pega.
+    if(salvandoAgora || contadorSalvamentos !== contadorAntes) return;
 
     const novaLista = doServidor.map(pServidor=>{
       const pLocal = pacientes.find(p=>p.id===pServidor.id);
@@ -2603,7 +2697,7 @@ async function atualizarDeOutrosComputadores(){
   } catch(e){ console.warn('Falha ao sincronizar com outros computadores:', e); }
 }
 
-setInterval(salvarEstado, 8000);
+setInterval(()=>{ if(!salvandoAgora) salvarEstado(); }, 8000);
 setInterval(atualizarDeOutrosComputadores, 15000);
 window.addEventListener('pagehide', salvarEstadoAoSair);
 window.addEventListener('beforeunload', salvarEstadoAoSair);
@@ -2628,7 +2722,11 @@ async function tentarLogin(){
     const resp = await fetch('/api/pacientes', { headers: await authHeaders() });
     if(resp.status === 401){ mostrarErroLogin('Senha da equipe incorreta.'); equipeSenha = null; return; }
     if(!resp.ok) throw new Error('Erro ' + resp.status);
-    pacientes = await resp.json();
+    pacientes = (await resp.json()).map(limparMarcasInternas);
+    // Foto de cada ficha como veio do banco. Sem isso, TODAS pareciam "modificadas" logo após o login
+    // e o primeiro salvamento automático reenviava a lista inteira por cima do banco.
+    pacientesOriginais = {};
+    pacientes.forEach(p => { pacientesOriginais[p.id] = JSON.stringify(p); });
     try{ localStorage.setItem(AUTH_STORAGE_SENHA, senha); localStorage.setItem(AUTH_STORAGE_NOME, nome); }catch(e){}
     document.getElementById('usuarioLogado').textContent = nome;
     esconderLoginGate();
@@ -2814,7 +2912,7 @@ async function exportarBackup(){
     try{
       const resp = await fetch('/api/pacientes', { headers: await authHeaders() });
       if(resp.ok){
-        pacientes = await resp.json();
+        pacientes = (await resp.json()).map(limparMarcasInternas);
         pacientesOriginais = {};
         pacientes.forEach(p => { pacientesOriginais[p.id] = JSON.stringify(p); });
         renderLista();
@@ -2853,7 +2951,7 @@ function importarBackup(input){
       if(equipeSenha){
         try{
           const resp = await fetch('/api/pacientes', { headers: await authHeaders() });
-          if(resp.ok) existentes = await resp.json();
+          if(resp.ok) existentes = (await resp.json()).map(limparMarcasInternas);
         }catch(err){}
       }
       const mapaExistentes = new Map(existentes.map(p=>[p.id, p]));

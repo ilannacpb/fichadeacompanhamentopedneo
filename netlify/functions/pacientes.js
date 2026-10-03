@@ -7,6 +7,16 @@
 //    não permite cabeçalhos customizados nesse tipo de envio, então a senha vai
 //    dentro do corpo do pedido, junto com a lista inteira de pacientes de uma vez
 //    (ver "pacientesBatch" abaixo).
+// "_novo" (marca só do navegador) e o id temporário nunca devem ser gravados dentro da ficha:
+// o id verdadeiro é a coluna "id" da tabela. Fichas antigas que já ficaram com essas marcas
+// gravadas também saem limpas na leitura, para não serem recriadas como se fossem novas.
+function limparDados(obj){
+  const d = Object.assign({}, obj || {});
+  delete d._novo;
+  delete d.id;
+  return d;
+}
+
 exports.handler = async (event) => {
   let bodyParsed = null;
   try { bodyParsed = event.body ? JSON.parse(event.body) : null; } catch (e) { bodyParsed = null; }
@@ -24,17 +34,15 @@ exports.handler = async (event) => {
       for (const p of bodyParsed.pacientesBatch) {
         if (typeof p.id === 'number' && p.id < 0) {
           // paciente novo (ainda não existe no banco) -> cria
-          const semId = Object.assign({}, p);
-          delete semId.id; delete semId._novo;
           await db.sql`
             INSERT INTO pacientes (dados, criado_por, atualizado_por)
-            VALUES (${JSON.stringify(semId)}::jsonb, ${nome}, ${nome})
+            VALUES (${JSON.stringify(limparDados(p))}::jsonb, ${nome}, ${nome})
           `;
         } else {
           // paciente já existente -> atualiza
           await db.sql`
             UPDATE pacientes
-            SET dados = ${JSON.stringify(p)}::jsonb, atualizado_por = ${nome}, atualizado_em = now()
+            SET dados = ${JSON.stringify(limparDados(p))}::jsonb, atualizado_por = ${nome}, atualizado_em = now()
             WHERE id = ${p.id}
           `;
         }
@@ -59,12 +67,12 @@ exports.handler = async (event) => {
 
     if (event.httpMethod === 'GET') {
       const rows = await db.sql`SELECT id, dados, atualizado_em FROM pacientes ORDER BY id ASC`;
-      const pacientes = rows.map(r => Object.assign({}, r.dados, { id: r.id }));
+      const pacientes = rows.map(r => Object.assign({}, limparDados(r.dados), { id: r.id }));
       return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pacientes) };
     }
 
     if (event.httpMethod === 'POST') {
-      const dados = bodyParsed;
+      const dados = limparDados(bodyParsed);
       const rows = await db.sql`
         INSERT INTO pacientes (dados, criado_por, atualizado_por)
         VALUES (${JSON.stringify(dados)}::jsonb, ${nomeUsuario}, ${nomeUsuario})
@@ -78,7 +86,7 @@ exports.handler = async (event) => {
       if (!id) return { statusCode: 400, body: JSON.stringify({ error: 'id é obrigatório para atualizar.' }) };
       await db.sql`
         UPDATE pacientes
-        SET dados = ${JSON.stringify(dados)}::jsonb, atualizado_por = ${nomeUsuario}, atualizado_em = now()
+        SET dados = ${JSON.stringify(limparDados(dados))}::jsonb, atualizado_por = ${nomeUsuario}, atualizado_em = now()
         WHERE id = ${id}
       `;
       return { statusCode: 200, body: JSON.stringify({ ok: true }) };
