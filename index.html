@@ -2829,45 +2829,69 @@ function imprimirCulturasAndamento(){
   janela.document.close();
 }
 
+// Limite de caracteres do diagnóstico no resumo impresso (o texto completo continua na ficha).
+const RESUMO_VISITA_MAX_DIAGNOSTICO = 250;
+
 function imprimirResumoVisita(){
   const ativos = pacientes.filter(p=>p.status==='Ativo');
   if(!ativos.length){ showToast('Nenhum paciente ativo para incluir no resumo.'); return; }
 
-  const statusRenalMapa = {preservada:'Preservada',piora:'Em Piora',melhora:'Em Melhora'};
-  const dietaMapa = {zero:'Dieta Zero',oral:'Dieta Oral',enteral:'Dieta Enteral',npt:'NPT'};
-  const aceitMapa = {boa:'boa aceitação',parcial:'aceitação parcial',intolerancia:'intolerância',residuo:'resíduo',regurgitacoes:'regurgitações'};
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const encurtar = (txt, max)=>{
+    const t = String(txt||'').replace(/\s+/g,' ').trim();
+    if(t.length <= max) return t;
+    const corte = t.slice(0, max);
+    const ult = corte.lastIndexOf(' ');
+    return (ult > max*0.6 ? corte.slice(0, ult) : corte).replace(/[\s,;:+\-]+$/,'') + '…';
+  };
+  const ventLabel = {}; CHIP_GROUPS.ventilacao.forEach(o=> ventLabel[o.k] = o.l);
+  const dietaLabel = {zero:'Zero', oral:'Oral', enteral:'Enteral', npt:'NPT'};
+  const nomeMed = d => d.med==='Outro' ? (d.custom||'—') : d.med;
+  const doseMed = d => d.dose ? ' '+d.dose : (d.vazao ? ' '+d.vazao+' mL/h' : '');
+  const item = txt => `<div class="item">${txt}</div>`;
+  const titulo = txt => `<div class="tit">${txt}</div>`;
 
   const linhas = ativos.map(p=>{
-    const medicamentos = [];
-    if(p.dva && p.dva.length) medicamentos.push(`<b>DVA:</b> ${p.dva.map(d=>`${d.med==='Outro'?(d.custom||'—'):d.med}${d.dose?' '+d.dose:(d.vazao?' '+d.vazao+' mL/h':'')}`).join(' + ')}`);
-    if((p.chips.sedoanalgesia||[]).includes('sim') && p.sedacao && p.sedacao.length) medicamentos.push(`<b>Sedação:</b> ${p.sedacao.map(d=>`${d.med==='Outro'?(d.custom||'—'):d.med}${d.dose?' '+d.dose:(d.vazao?' '+d.vazao+' mL/h':'')}`).join(' + ')}`);
-    if(p.lista_medicamentos) medicamentos.push(p.lista_medicamentos.replace(/</g,'&lt;'));
-    const medHtml = medicamentos.length ? medicamentos.join('<br>') : '—';
+    // Medicamentos: um por linha
+    const medBlocos = [];
+    if(p.dva && p.dva.length) medBlocos.push(titulo('DVA:') + p.dva.map(d=> item('- '+esc(nomeMed(d)+doseMed(d)))).join(''));
+    if((p.chips.sedoanalgesia||[]).includes('sim') && p.sedacao && p.sedacao.length) medBlocos.push(titulo('Sedação:') + p.sedacao.map(d=> item('- '+esc(nomeMed(d)+doseMed(d)))).join(''));
+    const outros = String(p.lista_medicamentos||'')
+      .replace(/([;.])\s+-\s+/g, '$1\n- ')   // itens colados na mesma linha ("...8/8h; - Ácido fólico...")
+      .split(/\r?\n/).map(l=> l.replace(/^\s*[-•]\s*/,'').trim()).filter(Boolean);
+    if(outros.length) medBlocos.push(outros.map(l=> item('- '+esc(l))).join(''));
+    const medHtml = medBlocos.length ? medBlocos.join('') : '—';
 
-    const atmHtml = (p.atms && p.atms.length) ? p.atms.map(a=>{
+    // Antimicrobianos em uso + culturas em andamento
+    const atmItens = (p.atms||[]).map(a=>{
       const dta = calcularDTA(a.inicio);
-      return `${a.med||'—'}${a.dose?' '+a.dose:''}${a.intervalo?' '+a.intervalo:''}${dta?' (D'+dta+')':''}`;
-    }).join('<br>') : 'Nenhum em uso atual';
+      return item('- '+esc(`${a.med||'—'}${a.dose?' '+a.dose:''}${a.intervalo?' '+a.intervalo:''}${dta?' (D'+dta+')':''}`));
+    }).join('');
+    const cultItens = (p.culturas||[]).filter(cu=> cu.resultadoFinal==='E/A (Em Andamento)').map(cu=>{
+      const data = cu.dataColeta ? formatarDataBR(cu.dataColeta).slice(0,5) : '';
+      return item('- '+esc(`${cu.material||'—'}${data?' ('+data+')':''}${cu.resParcial?' — '+cu.resParcial:''}`));
+    }).join('');
+    const atmHtml = titulo('# Antimicrobianos em uso') + (atmItens || item('Nenhum em uso atual'))
+      + '<div class="sep"></div>' + titulo('# Culturas em andamento') + (cultItens || item('Nenhuma em andamento'));
 
-    const statusRenalChip = (p.chips.statusRenal||[])[0];
-    const renalPartes = [];
-    if(statusRenalChip){
-      const cor = statusRenalChip==='piora'?'#B91C1C':(statusRenalChip==='melhora'?'#166534':'#333');
-      renalPartes.push(`<b style="color:${cor}">${statusRenalMapa[statusRenalChip]}</b>`);
-    }
-    if(p.ren_cr || p.ren_ureia) renalPartes.push(`Cr ${p.ren_cr||'—'} · Ur ${p.ren_ureia||'—'}`);
-    const dietaChipsAtivos = (p.chips.dieta||[]).map(k=>dietaMapa[k]).filter(Boolean);
-    const aceitChipsAtivos = (p.chips.aceitacao||[]).map(k=>aceitMapa[k]).filter(Boolean);
-    if(dietaChipsAtivos.length) renalPartes.push(dietaChipsAtivos.join(', ') + (aceitChipsAtivos.length? ' — '+aceitChipsAtivos.join(', ') : ''));
-    const renalHtml = renalPartes.length ? renalPartes.join('<br>') : '—';
+    // Resumo clínico
+    const ventTxt = (p.chips.ventilacao||[]).map(k=>ventLabel[k]).filter(Boolean).join(', ') || '—';
+    const dietaTxt = (p.chips.dieta||[]).map(k=>dietaLabel[k]).filter(Boolean).join(', ') || '—';
+    const resumoHtml = `<div><b># Ventilação:</b> ${esc(ventTxt)}</div>`
+      + `<div><b># Dieta:</b> ${esc(dietaTxt)}</div>`
+      + `<div><b># Função renal:</b> Cr ${p.ren_cr?esc(p.ren_cr):'—'} | Ur ${p.ren_ureia?esc(p.ren_ureia):'—'}</div>`
+      + `<div class="clcr">ClCr: ${p.ren_tfg?esc(p.ren_tfg):'—'}</div>`;
+
+    const idadeProntuario = [p.idade, 'Pront. '+(p.prontuario||'—')].filter(Boolean).map(esc).join(' · ');
+    const pesoAltura = `Peso: ${p.peso?esc(p.peso)+' kg':'—'} · Alt.: ${p.estatura?esc(p.estatura)+' cm':'—'}`;
 
     return `<tr>
-      <td>${p.leito||'—'}<br><span class="sub">${p.setor}</span></td>
-      <td><b>${p.nome}</b><br><span class="sub">${p.idade||''} · Pront. ${p.prontuario||'—'}</span></td>
-      <td>${p.diagnostico||'—'}</td>
+      <td>${esc(p.leito||'—')}<br><span class="sub">${esc(p.setor)}</span></td>
+      <td><b>${esc(p.nome)}</b><br><span class="sub">${idadeProntuario}</span><br><span class="sub">${pesoAltura}</span></td>
+      <td class="diag">${esc(encurtar(p.diagnostico, RESUMO_VISITA_MAX_DIAGNOSTICO) || '—')}</td>
       <td>${medHtml}</td>
       <td>${atmHtml}</td>
-      <td>${renalHtml}</td>
+      <td>${resumoHtml}</td>
       <td></td>
     </tr>`;
   }).join('');
@@ -2879,22 +2903,28 @@ function imprimirResumoVisita(){
     body{ font-family:'Inter',Arial,sans-serif; color:#1C2233; margin:0; padding:16px; }
     h1{ font-size:16px; color:#1D4ED8; margin:0 0 2px; }
     .sub-info{ font-size:11px; color:#6B7690; margin-bottom:14px; }
-    table{ width:100%; border-collapse:collapse; font-size:10.5px; }
-    th{ background:#2563EB; color:#fff; text-align:left; padding:6px 8px; }
-    td{ border:1px solid #D7DEEA; padding:6px 8px; vertical-align:top; }
+    table{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:10px; }
+    th{ background:#2563EB; color:#fff; text-align:left; padding:6px 7px; }
+    td{ border:1px solid #D7DEEA; padding:5px 7px; vertical-align:top; word-wrap:break-word; overflow-wrap:anywhere; }
     tr:nth-child(even) td{ background:#F4F6FA; }
     .sub{ color:#6B7690; font-size:9.5px; }
+    .diag{ font-size:9.5px; }
+    .item{ margin-bottom:2px; }
+    .tit{ font-weight:700; color:#1D4ED8; margin-top:1px; margin-bottom:2px; }
+    .sep{ height:7px; }
+    .clcr{ margin-left:0; }
     .anota{ margin-top:18px; font-weight:700; color:#1D4ED8; font-size:12px; }
     .linha{ border-bottom:1px solid #D7DEEA; height:26px; }
     .rodape{ margin-top:24px; text-align:center; font-size:9px; color:#9AA4B8; font-style:italic; }
-    @media print { .no-print{ display:none; } }
+    @media print { .no-print{ display:none; } tr{ page-break-inside:avoid; } }
   </style></head>
   <body>
     <button class="no-print" onclick="window.print()" style="margin-bottom:14px;padding:10px 18px;background:#2563EB;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar como PDF</button>
     <h1>FARMÁCIA CLÍNICA — HMAF &nbsp;|&nbsp; Resumo para Visita Multiprofissional</h1>
     <div class="sub-info">Data: ${hoje} &nbsp;&nbsp;&nbsp; Farmacêutica: ______________________</div>
     <table>
-      <thead><tr><th>Leito / Setor</th><th>Paciente</th><th>Diagnóstico</th><th>Medicamentos em Uso</th><th>Antimicrobiano (DTA)</th><th>Renal / Dieta</th><th>Pontos para Discussão</th></tr></thead>
+      <colgroup><col style="width:6%"><col style="width:13%"><col style="width:16%"><col style="width:22%"><col style="width:17%"><col style="width:16%"><col style="width:10%"></colgroup>
+      <thead><tr><th>Leito / Setor</th><th>Paciente</th><th>Diagnóstico</th><th>Medicamentos em Uso</th><th>Antimicrobiano (DTA)</th><th>Resumo clínico</th><th>Pontos para Discussão</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>
     <div class="anota">Anotações da visita:</div>
